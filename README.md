@@ -1,227 +1,222 @@
-# Node.js Project Bootstrapper
+# Node.js Backend Bootstrap CLI
 
-A powerful CLI tool to quickly scaffold Node.js projects with your preferred technology stack.
+🚀 A powerful CLI tool to quickly scaffold Node.js backend projects with your preferred technology stack.
 
-## Features
+## ✨ Key Features
 
-✅ **Multiple Templates**: Basic Template & BTL Template (NestJS)
-✅ **Multiple Frameworks**: Express.js, Fastify, Koa.js (Basic Template)
-✅ **Language Support**: TypeScript & JavaScript (Basic Template)  
-✅ **ORM Integration**: TypeORM, Sequelize, Prisma (Basic Template)
-✅ **Database Support**: PostgreSQL, MySQL, MSSQL, MongoDB, SQLite
-✅ **Authentication**: JWT & X-Signature (BTL Template), JWT-based auth setup (Basic Template)
-✅ **Logging**: Winston logger integration (Basic Template), Built-in logging (BTL Template)
-✅ **Validation**: Request validation setup (Joi, Zod, class-validator) (Basic Template), class-validator (BTL Template)
-✅ **Testing**: Jest testing framework (Basic Template)
-✅ **Docker**: Optional Docker configuration
-✅ **TypeScript**: Full TypeScript support with proper types
+### 📋 **Template Options**
 
-## Installation
+- **Basic Template** - Customizable Node.js project with framework selection
+- **BTL Template** - Production-ready NestJS application with enterprise features
 
-### Global Installation (Recommended)
+### 🛠️ **Framework Support**
 
-```bash
-# Install globally
-npm install -g project-bootstrapper
+- **Express.js** - Fast, unopinionated web framework
+- **Fastify** - High-performance, low-overhead framework  
+- **Koa.js** - Modern, lightweight framework
+- **NestJS** - Progressive Node.js framework (BTL Template)
 
-# Use anywhere
-init-project
-```
+### 🗄️ **Database & ORM**
 
-### Local Development
+- **Databases**: PostgreSQL, MySQL, MongoDB, SQLite, MSSQL
+- **ORMs**: TypeORM, Sequelize, Prisma
+- **Auto-configuration** with environment variables
+
+### 🔐 **Authentication**
+
+- **JWT Authentication** with bcrypt password hashing
+- **X-Signature Authentication** for API security (BTL Template)
+- **Configurable guards** and middleware
+
+### 🔧 **Development Features**
+
+- **TypeScript/JavaScript** support
+- **Request Validation** (Joi, Zod, class-validator)
+- **Logging** with Winston
+- **Testing** with Jest
+- **Docker** configuration
+- **ESLint & Prettier** setup
+
+## 🚀 Installation & Usage
+
+### Quick Start
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd bootstrap
+git clone https://github.com/dsaved/NodeJs-Backend-Bootstrap.git
+cd NodeJs-Backend-Bootstrap
 
 # Install dependencies
 npm install
 
-# Link globally for development
-npm link
-
-# Now you can use the CLI
-init-project
+# Run the CLI
+node init.js
 ```
 
-## Usage
+### Interactive Setup
 
-Simply run the command and follow the interactive prompts:
+The CLI will guide you through project configuration:
+
+1. **Application name** - Your project name
+2. **Template type** - Basic or BTL (NestJS)
+3. **Framework** - Express.js, Fastify, Koa.js *(Basic Template)*
+4. **Database** - PostgreSQL, MySQL, MongoDB, SQLite, MSSQL
+5. **ORM** - TypeORM, Sequelize, Prisma *(Basic Template)*
+6. **Language** - TypeScript or JavaScript *(Basic Template)*
+7. **Authentication** - JWT, X-Signature options
+8. **Features** - Logging, Validation, Testing, Docker
+
+### After Generation
 
 ```bash
-init-project
+# Navigate to your project
+cd your-app-name
+
+# Basic Template
+npm run dev
+
+# BTL Template (NestJS)
+make dev-start
 ```
 
-The CLI will ask you about:
+## 📁 Project Structure
 
-1. **Template** - Basic Template or BTL Template (NestJS)
-2. **Application name** - Your project name
-3. **Framework** - Express.js, Fastify, or Koa.js (Basic Template only)
-4. **ORM** - TypeORM, Sequelize, Prisma, or None (Basic Template only)
-5. **Database** - PostgreSQL, MySQL, MSSQL, MongoDB, or SQLite
-6. **Language** - TypeScript or JavaScript (Basic Template only)
-7. **Authentication Options**:
-   - Basic Template: JWT Authentication
-   - BTL Template: JWT Authentication and/or X-Signature Authentication
-8. **Features** - Logging, Validation, Testing, Docker (varies by template)
+### Basic Template Structure
 
-## Generated Project Structure
-
-```
+```text
 my-app/
 ├── src/
 │   ├── index.ts/js           # Main application entry
 │   ├── routes/               # API routes
-│   │   └── auth.ts/js        # Authentication routes (if enabled)
 │   ├── middleware/           # Custom middleware
-│   │   └── auth.ts/js        # Auth middleware (if enabled)
 │   ├── config/               # Configuration files
-│   │   └── database.ts/js    # Database configuration
 │   └── utils/                # Utility functions
-│       └── logger.ts/js      # Winston logger (if enabled)
-├── prisma/                   # Prisma schema (if Prisma selected)
-├── docker-compose.yml        # Docker configuration (if enabled)
-├── Dockerfile                # Docker configuration (if enabled)
-├── tsconfig.json             # TypeScript config (if TypeScript)
-├── .env.example              # Environment variables template
-├── .env                      # Environment variables
-├── .gitignore                # Git ignore rules
-├── package.json              # Project dependencies
-└── README.md                 # Project documentation
+├── tests/                    # Test files
+├── .env.example             # Environment template
+├── docker-compose.yml       # Docker configuration
+└── package.json             # Dependencies
 ```
 
-## Quick Start
+### BTL Template Structure
 
-After generating your project:
-
-```bash
-# Navigate to your project
-cd my-app
-
-# Start development server
-npm run dev
-
-# For Docker setup (if enabled)
-docker-compose up
+```text
+my-app/
+├── api/                     # Main NestJS application
+│   ├── src/
+│   │   ├── api/            # Feature modules
+│   │   ├── app-guards/     # Authentication guards
+│   │   └── constructs/     # Configuration
+├── email-service/          # Email microservice
+├── Makefile               # Development commands
+└── docker-compose.yml     # Docker setup
 ```
 
-## Available Scripts
+## 🛠️ Available Commands
 
-Generated projects include these npm scripts:
+### Basic Template
 
-- `npm run dev` - Start development server with hot reload
+- `npm run dev` - Start development server
 - `npm start` - Start production server
 - `npm run build` - Build TypeScript projects
-- `npm test` - Run tests (if testing enabled)
+- `npm test` - Run tests
 - `npm run lint` - Run linting
 
-## Environment Variables
+### BTL Template
 
-Each generated project includes a comprehensive `.env.example` file with:
+- `make install` - Install all dependencies
+- `make dev-start` - Start development server
+- `make db-migrate-up` - Run database migrations
+- `make db-seeder-run` - Run database seeders
+- `make email-test` - Test email service
 
-- Database connection strings
-- JWT secrets (if auth enabled)
-- Port configuration
-- Environment-specific settings
+## ⚙️ Configuration
 
-## Technology Stack Options
+### Environment Variables
 
-### Templates
+Each generated project includes a `.env.example` file with:
 
-- **Basic Template** - Customizable Node.js project with framework selection
-- **BTL Template (NestJS)** - Enterprise-ready NestJS application with built-in modules
+**Basic Template:**
 
-### BTL Template Features
+```env
+NODE_ENV=development
+PORT=3000
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=password
+DB_NAME=myapp
+
+# JWT (if enabled)
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=7d
+```
+
+**BTL Template:**
+
+```env
+APP_NAME=my-app
+NODE_ENV=development
+PORT=3000
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=password
+DB_NAME=myapp
+
+# Authentication
+JWT_SECRET=your-jwt-secret
+PRE_SHARED_API_KEY=your-x-signature-key
+
+# Email Service
+EMAIL_SERVICE_URL=http://localhost:3001
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+```
+
+## 🏗️ BTL Template Features
 
 The BTL Template is a production-ready NestJS application that includes:
 
+### Core Features
+
 - **NestJS Framework** with TypeScript
 - **TypeORM** with database migrations and seeders
-- **Configurable Authentication**:
-  - JWT Authentication with Passport
-  - X-Signature Authentication with SHA256 validation
-- **Built-in Modules**:
-  - User management
-  - Role-based access control
-  - File upload (AWS S3 integration)
-  - Email notifications
-  - Audit logging
-- **Security Features**:
-  - Helmet security headers
-  - CORS configuration
-  - Request validation with class-validator
-  - Environment-based configuration
-- **Development Tools**:
-  - Database migrations and seeders
-  - API documentation
-  - Comprehensive error handling
-  - Request logging middleware
+- **Multi-service Architecture** (API + Email Service)
+- **Makefile Integration** for easy command management
 
-### Frameworks
-- **Express.js** - Fast, unopinionated web framework
-- **Fastify** - Fast and low overhead web framework
-- **Koa.js** - Modern, lightweight web framework
+### Authentication & Security
 
-### ORMs
-- **TypeORM** - Feature-rich ORM with TypeScript support
-- **Sequelize** - Mature, feature-rich ORM
-- **Prisma** - Modern database toolkit with type safety
-- **None** - No ORM, manual database handling
+- **JWT Authentication** with Passport
+- **X-Signature Authentication** with SHA256 validation
+- **Helmet Security Headers**
+- **CORS Configuration**
+- **Request Validation** with class-validator
 
-### Databases
-- **PostgreSQL** - Advanced open-source relational database
-- **MySQL** - Popular relational database
-- **MSSQL** - Microsoft SQL Server
-- **MongoDB** - NoSQL document database
-- **SQLite** - Lightweight, serverless database
+### Built-in Modules
 
-## Features in Detail
+- **User Management** with role-based access control
+- **Email Notifications** service
+- **File Upload** with AWS S3 integration
+- **Audit Logging** and request tracking
+- **OTP Management** for two-factor authentication
 
-### Authentication
-- JWT-based authentication
-- Registration and login endpoints
-- Password hashing with bcrypt
-- Auth middleware for protected routes
-- TypeScript interfaces for auth
+### Development Tools
 
-### Logging
-- Winston logger integration
-- Multiple transport options
-- Environment-specific log levels
-- Error logging and tracking
+- **Database Migrations** and seeders
+- **API Documentation** generation
+- **Comprehensive Error Handling**
+- **Request Logging Middleware**
+- **Environment-based Configuration**
 
-### Validation
+## 🧪 Testing
 
-- **Joi** - Object schema validation library
-- **Zod** - TypeScript-first schema validation with static type inference
-- **class-validator** - Decorator-based validation for classes, works great with TypeScript
-
-### Testing
-- Jest testing framework
-- Supertest for API testing
-- TypeScript support for tests
-- Basic test structure
-
-### Docker
-- Multi-stage Dockerfile
-- Docker Compose with database services
-- Development and production configurations
-- Volume mounting for development
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -am 'Add my feature'`
-4. Push to the branch: `git push origin feature/my-feature`
-5. Submit a pull request
-
-## Development Testing
-
-This CLI tool includes comprehensive tests to ensure functionality:
-
-### Available Tests
+This CLI includes comprehensive tests to ensure functionality:
 
 ```bash
 # Basic CLI structure validation
@@ -231,36 +226,34 @@ node test-cli.js
 node test-btl-cli.js
 ```
 
-### Test Coverage
+**Test Coverage:**
 
-- ✅ **CLI Structure**: Validates all required files and configuration
-- ✅ **Template Integrity**: Ensures all template files are present
-- ✅ **BTL Template**: Tests full BTL template with Makefile integration
-- ✅ **Customization**: Verifies all customizations are applied correctly
-- ✅ **Makefile**: Tests all Makefile commands and syntax validation
+- ✅ CLI Structure validation
+- ✅ Template integrity checks
+- ✅ BTL Template with Makefile integration
+- ✅ Authentication customization
+- ✅ Database configuration
 
-## Publishing
+## 🤝 Contributing
 
-To publish this CLI tool to npm:
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
-```bash
-# Update package.json with unique name and version
-npm login
-npm publish
-```
+## 📄 License
 
-## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-MIT License - see LICENSE file for details
+## 🆘 Support
 
-## Support
-
-If you encounter any issues or have questions:
+If you encounter any issues:
 
 1. Check the generated project's README.md
-2. Review the environment variables in .env.example
+2. Review environment variables in `.env.example`
 3. Ensure all dependencies are installed
-4. Check the logs for error messages
+4. Create an issue with detailed information
 
 ---
 
