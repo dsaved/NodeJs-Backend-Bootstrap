@@ -41,7 +41,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '50mb' }));
   app.use(requestLogger());
 
-  //^ Satert app
+  //^ Start app
   await app
     .listen(appEnv.port)
     .then(async () =>
