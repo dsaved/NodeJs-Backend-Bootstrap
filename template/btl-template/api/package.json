@@ -69,7 +69,6 @@
     "speakeasy": "^2.0.0",
     "typeorm": "^0.3.20",
     "typeorm-extension": "^3.6.3",
-    "typeorm-seeding": "^1.6.1",
     "umzug": "^3.8.2",
     "uuid": "^10.0.0"
   },

@@ -14,8 +14,8 @@ import { UserAuthGuard } from './app-guards/jwt-auth.guard';
     TypeOrmModule.forRoot({
       type: 'postgres',
       ...dbConfig,
-      entities: [join(__dirname, './../models/**.{.ts,.js}')],
-      migrations: [join(__dirname, './../migrations/{.ts,*.js}')],
+      entities: [join(__dirname, './model/**/*.{ts,js}')],
+      migrations: [join(__dirname, './migrations/**/*.{ts,js}')],
       autoLoadEntities: true,
       logging: true,
     }),
@@ -36,5 +36,7 @@ import { UserAuthGuard } from './app-guards/jwt-auth.guard';
   exports: [],
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {}
+  configure(consumer: MiddlewareConsumer): void {
+    // Add middleware configuration here if needed
+  }
 }

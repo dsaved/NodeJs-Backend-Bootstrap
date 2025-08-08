@@ -433,7 +433,17 @@ async function copySelectedORMModels(targetDir, answers) {
       if (file === "index.ts" || file.endsWith(".model.ts")) {
         const sourceFile = path.join(sourceOrmDir, file);
         const targetFile = path.join(targetModelsDir, file);
-        fs.copyFileSync(sourceFile, targetFile);
+        
+        // Read file content and fix import paths
+        let content = fs.readFileSync(sourceFile, 'utf8');
+        
+        // Fix import paths when copying from subfolder to root model directory
+        if (answers.orm === "TypeORM") {
+          // Change '../../constructs' to '../constructs' since we're moving from typeorm/ to model/
+          content = content.replace(/import { enums } from '\.\.\/\.\.\/constructs';/g, "import { enums } from '../constructs';");
+        }
+        
+        fs.writeFileSync(targetFile, content);
       }
     }
     console.log(`✅ Copied ${answers.orm} models to ./src/model/`);
@@ -877,8 +887,8 @@ async function generateTypeORMMigration(migrationDir, timestamp, answers) {
         \`);`;
 
     indexCreation = `
-        await queryRunner.query(\`CREATE INDEX "IDX_users_email" ON "users" ("email") \`);
-        await queryRunner.query(\`CREATE INDEX "IDX_users_isActive" ON "users" ("isActive") \`);`;
+        await queryRunner.query(\`CREATE INDEX "IDX_users_email" ON "users" ("email")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_isActive" ON "users" ("isActive")\`);`;
 
     tableDrop = `
         await queryRunner.query(\`DROP INDEX "IDX_users_isActive"\`);

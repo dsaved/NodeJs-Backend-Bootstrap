@@ -5,7 +5,7 @@ import {
   Index,
 } from 'typeorm';
 import { BaseModel } from './base.model';
-import { enums } from '../constructs';
+import { enums } from '../../constructs';
 
 @Entity({ name: 'users' })
 @Unique('users_unique_phone_number', ['phoneNumber'])

@@ -4,9 +4,9 @@ import { DataSource } from 'typeorm';
 const dataSource = new DataSource({
   type: 'postgres',
   ...dbConfig,
-  entities: [`src/model/*{.ts,.js}`],
-  migrations: [`src/migrations/*{.ts,.js}`],
-  seeds: ['src/seeders/*{.ts,.js}'],
+  entities: [`${__dirname}/../model/**/*.{ts,js}`],
+  migrations: [`${__dirname}/../migrations/**/*.{ts,js}`],
+  seeds: [`${__dirname}/../seeders/**/*.{ts,js}`],
 } as any);
 
 dataSource
