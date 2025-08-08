@@ -21,22 +21,22 @@ migration-generate:
 	yarn --cwd api migration:generate src/migrations/${file}
 
 db-migrate-up:
-	yarn --cwd api migration:run
+	cd api && yarn migration:run
 
 db-migrate-revert:
-	yarn --cwd api migration:revert
+	cd api && yarn migration:undo
 
 db-migrate-reset:
-	yarn --cwd api migration:reset
+	cd api && yarn migration:undo:all
 
 db-migrate-down:
-	yarn --cwd api migration:down
+	cd api && yarn migration:undo
 
 db-migrate-drop:
-	yarn --cwd api migration:drop
+	cd api && yarn migration:drop
 
 db-migrate-sync:
-	yarn --cwd api migration:sync
+	cd api && yarn migration:sync
 
 db-seeder-run:
-	yarn --cwd api seed:run
+	cd api && yarn seed:run

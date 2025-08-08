@@ -45,3 +45,15 @@ Thumbs.db
 
 # Test output
 test-project*/
+test-*/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Documentation artifacts
+*_IMPLEMENTATION.md
+*_FIXES_COMPLETE.md
+ORM_*.md
+MIGRATION_*.md

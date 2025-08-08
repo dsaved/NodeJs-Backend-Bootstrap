@@ -2,9 +2,9 @@
   "name": "project-bootstrapper",
   "version": "1.0.0",
   "description": "A custom Node.js project bootstrapper with ORM and database selection",
-  "main": "init.js",
+  "main": "src/init.js",
   "bin": {
-    "init-project": "init.js"
+    "init-project": "src/init.js"
   },
   "keywords": [
     "cli",
@@ -18,7 +18,12 @@
   "dependencies": {
     "dotenv": "^17.2.1",
     "fs-extra": "^10.0.0",
-    "inquirer": "^8.0.0"
+    "inquirer": "^8.0.0",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "reflect-metadata": "^0.2.2",
+    "sequelize": "^6.37.7",
+    "typeorm": "^0.3.25"
   },
   "engines": {
     "node": ">=14.0.0"
