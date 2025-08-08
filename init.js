@@ -35,7 +35,11 @@ async function main() {
       type: "list",
       name: "template",
       message: "Select the project template:",
-      choices: ["Basic Template", "BTL Template (NestJS)"],
+      choices: [
+        "Basic Template",
+        "NestJS Template", 
+        "BTL Template (Enterprise NestJS)"
+      ],
       default: "Basic Template",
     },
     {
@@ -62,7 +66,8 @@ async function main() {
       default: "PostgreSQL",
       when: (answers) =>
         (answers.orm !== "None" && answers.template === "Basic Template") ||
-        answers.template === "BTL Template (NestJS)",
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
     },
     {
       type: "list",
@@ -84,14 +89,36 @@ async function main() {
       name: "enableJwtAuth",
       message: "Do you want JWT authentication?",
       default: true,
-      when: (answers) => answers.template === "BTL Template (NestJS)",
+      when: (answers) => 
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
     },
     {
       type: "confirm",
       name: "enableXSignature",
       message: "Do you want X-Signature authentication?",
       default: true,
-      when: (answers) => answers.template === "BTL Template (NestJS)",
+      when: (answers) => 
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
+    },
+    {
+      type: "confirm",
+      name: "enablePM2tools",
+      message: "Do you want PM2 process management tools?",
+      default: false,
+      when: (answers) => 
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
+    },
+    {
+      type: "confirm",
+      name: "enableUnitTesting",
+      message: "Do you want comprehensive unit testing setup?",
+      default: true,
+      when: (answers) => 
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
     },
     {
       type: "confirm",
@@ -128,6 +155,7 @@ async function main() {
       name: "enableDocker",
       message: "Do you want Docker configuration?",
       default: false,
+      when: (answers) => !answers.enablePM2tools, // Only show Docker if PM2 is not selected
     },
   ]);
 
@@ -144,17 +172,21 @@ async function main() {
 
   // Choose template directory based on selection
   let templateDir;
-  if (answers.template === "BTL Template (NestJS)") {
-    templateDir = path.join(__dirname, "btl-template");
+  if (answers.template === "BTL Template (Enterprise NestJS)") {
+    templateDir = path.join(__dirname, "template", "btl-template");
+  } else if (answers.template === "NestJS Template") {
+    templateDir = path.join(__dirname, "template", "nestjs");
   } else {
-    templateDir = path.join(__dirname, "template");
+    templateDir = path.join(__dirname, "template", "basic");
   }
 
   fs.copySync(templateDir, targetDir);
 
   // Handle different template types
-  if (answers.template === "BTL Template (NestJS)") {
+  if (answers.template === "BTL Template (Enterprise NestJS)") {
     await customizeBTLTemplate(targetDir, answers);
+  } else if (answers.template === "NestJS Template") {
+    await customizeNestJSTemplate(targetDir, answers);
   } else {
     await customizeBasicTemplate(targetDir, answers);
   }
@@ -167,37 +199,118 @@ async function main() {
   console.log(`\n📋 Next steps:`);
   console.log(`   cd ${answers.appName}`);
 
-  if (answers.template === "BTL Template (NestJS)") {
+  if (answers.template === "BTL Template (Enterprise NestJS)") {
     console.log(`   make dev-start`);
     console.log(`\n🔧 Configuration:`);
+    
     if (answers.enableJwtAuth) {
       console.log(`   ✅ JWT Authentication enabled`);
     } else {
       console.log(`   ❌ JWT Authentication disabled`);
     }
+    
     if (answers.enableXSignature) {
       console.log(`   ✅ X-Signature Authentication enabled`);
     } else {
       console.log(`   ❌ X-Signature Authentication disabled`);
     }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   ✅ PM2 Process Management enabled`);
+    }
+    
+    if (answers.enableUnitTesting) {
+      console.log(`   ✅ Comprehensive Unit Testing enabled`);
+    }
+    
     console.log(`\n📝 Don't forget to:`);
     console.log(`   • Update api/.env file with your database credentials`);
     console.log(`   • Run migrations: make db-migrate-up`);
     console.log(`   • Run seeders: make db-seeder-run`);
+    
     if (answers.enableXSignature) {
-      console.log(
-        `   • Set PRE_SHARED_API_KEY in api/.env for X-Signature auth`
-      );
+      console.log(`   • Set PRE_SHARED_API_KEY in api/.env for X-Signature auth`);
     }
+    
     if (answers.enableJwtAuth) {
       console.log(`   • Set JWT_SECRET in api/.env for JWT auth`);
     }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   • Configure PM2 settings in ecosystem.config.cjs`);
+    }
+    
     console.log(`\n🛠️  Available Makefile commands:`);
     console.log(`   • make install - Install dependencies for all services`);
     console.log(`   • make dev-start - Start development server`);
     console.log(`   • make db-migrate-up - Run database migrations`);
     console.log(`   • make db-seeder-run - Run database seeders`);
     console.log(`   • make email-test - Test email service`);
+    
+    if (answers.enableUnitTesting) {
+      console.log(`   • make test - Run comprehensive unit tests`);
+    }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   • make pm2-start - Start with PM2`);
+      console.log(`   • make pm2-stop - Stop PM2 processes`);
+    }
+    
+  } else if (answers.template === "NestJS Template") {
+    console.log(`   npm run start:dev`);
+    console.log(`\n🔧 Configuration:`);
+    
+    if (answers.enableJwtAuth) {
+      console.log(`   ✅ JWT Authentication enabled`);
+    } else {
+      console.log(`   ❌ JWT Authentication disabled`);
+    }
+    
+    if (answers.enableXSignature) {
+      console.log(`   ✅ X-Signature Authentication enabled`);
+    } else {
+      console.log(`   ❌ X-Signature Authentication disabled`);
+    }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   ✅ PM2 Process Management enabled`);
+    }
+    
+    if (answers.enableUnitTesting) {
+      console.log(`   ✅ Comprehensive Unit Testing enabled`);
+    }
+    
+    console.log(`\n📝 Don't forget to:`);
+    console.log(`   • Update .env file with your database credentials`);
+    
+    if (answers.enableXSignature) {
+      console.log(`   • Set PRE_SHARED_API_KEY in .env for X-Signature auth`);
+    }
+    
+    if (answers.enableJwtAuth) {
+      console.log(`   • Set JWT_SECRET in .env for JWT auth`);
+    }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   • Configure PM2 settings in ecosystem.config.cjs`);
+    }
+    
+    console.log(`\n🛠️  Available commands:`);
+    console.log(`   • npm run start:dev - Start development server`);
+    console.log(`   • npm run build - Build for production`);
+    console.log(`   • npm run migration:run - Run database migrations`);
+    
+    if (answers.enableUnitTesting) {
+      console.log(`   • npm run test - Run unit tests`);
+      console.log(`   • npm run test:e2e - Run end-to-end tests`);
+      console.log(`   • npm run test:cov - Run tests with coverage`);
+    }
+    
+    if (answers.enablePM2tools) {
+      console.log(`   • npm run pm2:start - Start with PM2`);
+      console.log(`   • npm run pm2:stop - Stop PM2 processes`);
+    }
+    
   } else {
     console.log(`   npm run dev`);
   }
@@ -259,6 +372,16 @@ async function customizeBTLTemplate(targetDir, answers) {
   // Customize auth guards based on selections
   await customizeBTLAuthGuards(targetDir, answers);
 
+  // Generate PM2 configuration if enabled
+  if (answers.enablePM2tools) {
+    await generateBTLPM2Config(targetDir, answers);
+  }
+
+  // Setup comprehensive unit testing if enabled
+  if (answers.enableUnitTesting) {
+    await setupBTLUnitTesting(targetDir, answers);
+  }
+
   // Install dependencies for BTL template
   console.log("📥 Installing dependencies...");
   await installBTLDependencies(targetDir, answers);
@@ -317,6 +440,56 @@ async function customizeBTLEnvironment(targetDir, answers) {
         /DB_NAME=.*/,
         `DB_NAME=${answers.appName}`
       );
+      break;
+    case "MSSQL":
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=1433");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "DB_USERNAME=sa");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "DB_PASSWORD=YourPassword123");
+      envContent = envContent.replace(
+        /DB_NAME=.*/,
+        `DB_NAME=${answers.appName}`
+      );
+      break;
+    case "MongoDB":
+      // For MongoDB, we use different environment variables
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=27017");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "# DB_USERNAME=admin");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "# DB_PASSWORD=password");
+      envContent = envContent.replace(
+        /DB_NAME=.*/,
+        `DB_NAME=${answers.appName}`
+      );
+      // Add MongoDB connection string
+      if (!envContent.includes("DATABASE_URL")) {
+        envContent += `\nDATABASE_URL=mongodb://localhost:27017/${answers.appName}`;
+      } else {
+        envContent = envContent.replace(
+          /DATABASE_URL=.*/,
+          `DATABASE_URL=mongodb://localhost:27017/${answers.appName}`
+        );
+      }
+      break;
+    case "SQLite":
+      // SQLite doesn't need host, port, username, password
+      envContent = envContent.replace(/DB_HOST=.*/, "# DB_HOST=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_PORT=.*/, "# DB_PORT=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "# DB_USERNAME=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "# DB_PASSWORD=not_required_for_sqlite");
+      envContent = envContent.replace(
+        /DB_NAME=.*/,
+        `DB_NAME=${answers.appName}.db`
+      );
+      // Add SQLite database path
+      if (!envContent.includes("DATABASE_URL")) {
+        envContent += `\nDATABASE_URL=file:./${answers.appName}.db`;
+      } else {
+        envContent = envContent.replace(
+          /DATABASE_URL=.*/,
+          `DATABASE_URL=file:./${answers.appName}.db`
+        );
+      }
       break;
   }
 
@@ -470,6 +643,955 @@ async function installBTLDependencies(targetDir, answers) {
     console.log("You can install them manually by running:");
     console.log(`cd ${path.basename(targetDir)}`);
     console.log(`make install`);
+  }
+}
+
+async function generateBTLPM2Config(targetDir, answers) {
+  const pm2Config = `module.exports = {
+  apps: [
+    {
+      name: '${answers.appName}-api',
+      script: 'api/dist/main.js',
+      instances: 'max',
+      exec_mode: 'cluster',
+      cwd: process.cwd(),
+      env: {
+        NODE_ENV: 'development'
+      },
+      env_production: {
+        NODE_ENV: 'production'
+      },
+      watch: false,
+      ignore_watch: ['node_modules', 'logs', 'api/logs'],
+      error_file: './logs/api-err.log',
+      out_file: './logs/api-out.log',
+      log_file: './logs/api-combined.log',
+      time: true,
+      max_memory_restart: '1G',
+      node_args: '--max_old_space_size=4096'
+    },
+    {
+      name: '${answers.appName}-email',
+      script: 'email-service/dist/main.js',
+      instances: 1,
+      exec_mode: 'fork',
+      cwd: process.cwd(),
+      env: {
+        NODE_ENV: 'development'
+      },
+      env_production: {
+        NODE_ENV: 'production'
+      },
+      watch: false,
+      ignore_watch: ['node_modules', 'logs'],
+      error_file: './logs/email-err.log',
+      out_file: './logs/email-out.log',
+      log_file: './logs/email-combined.log',
+      time: true,
+      max_memory_restart: '512M'
+    }
+  ]
+};`;
+
+  fs.writeFileSync(path.join(targetDir, "ecosystem.config.cjs"), pm2Config);
+  
+  // Create logs directory
+  fs.mkdirSync(path.join(targetDir, "logs"), { recursive: true });
+  
+  // Update Makefile with PM2 commands
+  const makefilePath = path.join(targetDir, "Makefile");
+  if (fs.existsSync(makefilePath)) {
+    let makefileContent = fs.readFileSync(makefilePath, "utf8");
+    
+    const pm2Commands = `
+
+# PM2 Process Management
+pm2-start:
+\tpm2 start ecosystem.config.cjs
+
+pm2-stop:
+\tpm2 stop ecosystem.config.cjs
+
+pm2-restart:
+\tpm2 restart ecosystem.config.cjs
+
+pm2-delete:
+\tpm2 delete ecosystem.config.cjs
+
+pm2-status:
+\tpm2 status
+
+pm2-logs:
+\tpm2 logs`;
+
+    makefileContent += pm2Commands;
+    fs.writeFileSync(makefilePath, makefileContent);
+  }
+}
+
+async function setupBTLUnitTesting(targetDir, answers) {
+  // Update package.json for comprehensive testing
+  const apiPackageJsonPath = path.join(targetDir, "api/package.json");
+  const apiPackageJson = JSON.parse(fs.readFileSync(apiPackageJsonPath, "utf8"));
+
+  // Update Jest configuration for comprehensive testing
+  apiPackageJson.jest = {
+    moduleFileExtensions: ['js', 'json', 'ts'],
+    rootDir: 'src',
+    testRegex: '.*\\.spec\\.ts$',
+    transform: {
+      '^.+\\.(t|j)s$': 'ts-jest'
+    },
+    collectCoverageFrom: [
+      '**/*.(t|j)s',
+      '!**/*.module.ts',
+      '!**/main.ts'
+    ],
+    coverageDirectory: '../coverage',
+    testEnvironment: 'node',
+    coverageReporters: ['text', 'lcov', 'html'],
+    coverageThreshold: {
+      global: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80
+      }
+    }
+  };
+
+  // Add test scripts
+  apiPackageJson.scripts = {
+    ...apiPackageJson.scripts,
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  };
+
+  fs.writeFileSync(apiPackageJsonPath, JSON.stringify(apiPackageJson, null, 2));
+
+  // Create comprehensive test files for BTL template
+  await createBTLTestFiles(targetDir, answers);
+
+  // Update Makefile with test commands
+  const makefilePath = path.join(targetDir, "Makefile");
+  if (fs.existsSync(makefilePath)) {
+    let makefileContent = fs.readFileSync(makefilePath, "utf8");
+    
+    const testCommands = `
+
+# Testing Commands
+test:
+\tyarn --cwd api test
+
+test-watch:
+\tyarn --cwd api test:watch
+
+test-coverage:
+\tyarn --cwd api test:cov
+
+test-e2e:
+\tyarn --cwd api test:e2e`;
+
+    makefileContent += testCommands;
+    fs.writeFileSync(makefilePath, makefileContent);
+  }
+}
+
+async function createBTLTestFiles(targetDir, answers) {
+  const apiTestDir = path.join(targetDir, "api/src");
+  const e2eTestDir = path.join(targetDir, "api/test");
+  fs.ensureDirSync(e2eTestDir);
+
+  // App Controller Test
+  const appControllerTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+describe('AppController', () => {
+  let appController: AppController;
+  let appService: AppService;
+
+  beforeEach(async () => {
+    const app: TestingModule = await Test.createTestingModule({
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
+
+    appController = app.get<AppController>(AppController);
+    appService = app.get<AppService>(AppService);
+  });
+
+  describe('getHello', () => {
+    it('should return application info', () => {
+      const result = appController.getHello();
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+    });
+  });
+
+  describe('getHealth', () => {
+    it('should return health status', () => {
+      const result = appController.getHealth();
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe('OK');
+    });
+  });
+});`;
+
+  fs.writeFileSync(path.join(apiTestDir, "app.controller.spec.ts"), appControllerTestContent);
+
+  // App Service Test
+  const appServiceTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { AppService } from './app.service';
+
+describe('AppService', () => {
+  let service: AppService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [AppService],
+    }).compile();
+
+    service = module.get<AppService>(AppService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('getHello', () => {
+    it('should return application info', () => {
+      const result = service.getHello();
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result).toHaveProperty('message');
+      expect(result).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('getHealth', () => {
+    it('should return health status', () => {
+      const result = service.getHealth();
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe('OK');
+      expect(result).toHaveProperty('timestamp');
+    });
+  });
+});`;
+
+  fs.writeFileSync(path.join(apiTestDir, "app.service.spec.ts"), appServiceTestContent);
+
+  // E2E Test for BTL Template
+  const e2eTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../src/app.module';
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(res.body).toHaveProperty('timestamp');
+      });
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('status');
+        expect(res.body.status).toBe('OK');
+      });
+  });
+
+  ${answers.enableJwtAuth ? `
+  describe('Authentication (JWT)', () => {
+    it('/api/auth/login (POST) - should require credentials', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({})
+        .expect(400);
+    });
+
+    it('/api/auth/register (POST) - should validate input', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          email: 'invalid-email',
+          password: '123'
+        })
+        .expect(400);
+    });
+
+    it('/api/protected (GET) - should require authentication', () => {
+      return request(app.getHttpServer())
+        .get('/api/protected')
+        .expect(401);
+    });
+  });
+  ` : ""}
+
+  ${answers.enableXSignature ? `
+  describe('X-Signature Authentication', () => {
+    it('should reject requests without X-Signature', () => {
+      return request(app.getHttpServer())
+        .get('/api/secure-endpoint')
+        .expect(401);
+    });
+
+    it('should reject requests with invalid X-Signature', () => {
+      return request(app.getHttpServer())
+        .get('/api/secure-endpoint')
+        .set('X-Signature', 'invalid-signature')
+        .expect(401);
+    });
+  });
+  ` : ""}
+
+  ${answers.db ? `
+  describe('Database Health', () => {
+    it('/api/health/database (GET)', () => {
+      return request(app.getHttpServer())
+        .get('/api/health/database')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('database');
+          expect(res.body.database).toBe('connected');
+        });
+    });
+  });
+  ` : ""}
+
+  describe('Error Handling', () => {
+    it('should handle 404 for non-existent routes', () => {
+      return request(app.getHttpServer())
+        .get('/non-existent-route')
+        .expect(404);
+    });
+
+    it('should handle malformed JSON', () => {
+      return request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('Content-Type', 'application/json')
+        .send('{"invalid": json}')
+        .expect(400);
+    });
+  });
+});`;
+
+  fs.writeFileSync(path.join(e2eTestDir, "app.e2e-spec.ts"), e2eTestContent);
+
+  // Jest E2E Configuration for BTL
+  const jestE2eConfig = {
+    moduleFileExtensions: ['js', 'json', 'ts'],
+    rootDir: '.',
+    testEnvironment: 'node',
+    testRegex: '.e2e-spec.ts$',
+    transform: {
+      '^.+\\.(t|j)s$': 'ts-jest'
+    },
+    setupFilesAfterEnv: ['<rootDir>/test-setup.ts']
+  };
+
+  fs.writeFileSync(path.join(e2eTestDir, "jest-e2e.json"), JSON.stringify(jestE2eConfig, null, 2));
+
+  // Test setup for BTL
+  const testSetupContent = `import { Test } from '@nestjs/testing';
+import { AppModule } from '../src/app.module';
+
+// Global test setup for BTL template
+beforeAll(async () => {
+  // Set test environment variables
+  process.env.NODE_ENV = 'test';
+  process.env.DB_HOST = 'localhost';
+  process.env.DB_PORT = '5432';
+  process.env.DB_USERNAME = 'test';
+  process.env.DB_PASSWORD = 'test';
+  process.env.DB_NAME = 'test_db';
+  process.env.JWT_SECRET = 'test-jwt-secret';
+  process.env.PRE_SHARED_API_KEY = 'test-api-key';
+});
+
+// Global test utilities
+export class TestHelpers {
+  static async createTestModule() {
+    return await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+  }
+
+  static generateJWTToken(): string {
+    return 'test-jwt-token';
+  }
+
+  static generateValidXSignature(): string {
+    return 'test-valid-signature';
+  }
+
+  static createMockUser() {
+    return {
+      id: 1,
+      email: 'test@example.com',
+      password: 'hashed-password',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  static createMockRequest(data: any = {}) {
+    return {
+      body: data,
+      headers: {},
+      user: null,
+      ...data
+    };
+  }
+}`;
+
+  fs.writeFileSync(path.join(e2eTestDir, "test-setup.ts"), testSetupContent);
+
+  // Auth Service Test (if JWT is enabled)
+  if (answers.enableJwtAuth) {
+    const authServiceTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
+
+describe('AuthService', () => {
+  let service: AuthService;
+  let jwtService: JwtService;
+  let usersService: UsersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn().mockReturnValue('test-token'),
+            verify: jest.fn().mockReturnValue({ userId: 1 }),
+          },
+        },
+        {
+          provide: UsersService,
+          useValue: {
+            findByEmail: jest.fn(),
+            create: jest.fn(),
+            validatePassword: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<AuthService>(AuthService);
+    jwtService = module.get<JwtService>(JwtService);
+    usersService = module.get<UsersService>(UsersService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('validateUser', () => {
+    it('should return user data for valid credentials', async () => {
+      const mockUser = { id: 1, email: 'test@example.com' };
+      jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser as any);
+      jest.spyOn(usersService, 'validatePassword').mockResolvedValue(true);
+
+      const result = await service.validateUser('test@example.com', 'password');
+      expect(result).toEqual(mockUser);
+    });
+
+    it('should return null for invalid credentials', async () => {
+      jest.spyOn(usersService, 'findByEmail').mockResolvedValue(null);
+
+      const result = await service.validateUser('test@example.com', 'password');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('login', () => {
+    it('should return access token', async () => {
+      const mockUser = { id: 1, email: 'test@example.com' };
+      const result = await service.login(mockUser);
+
+      expect(result).toHaveProperty('access_token');
+      expect(jwtService.sign).toHaveBeenCalled();
+    });
+  });
+});`;
+
+    // Check if auth directory exists
+    const authDir = path.join(targetDir, "api/src/auth");
+    if (fs.existsSync(authDir)) {
+      fs.writeFileSync(path.join(authDir, "auth.service.spec.ts"), authServiceTestContent);
+    }
+  }
+}
+
+async function customizeNestJSTemplate(targetDir, answers) {
+  // Customize package.json for NestJS template
+  await customizeNestJSPackageJson(targetDir, answers);
+
+  // Customize environment variables
+  await customizeNestJSEnvironment(targetDir, answers);
+
+  // Customize auth modules based on selections
+  await customizeNestJSAuthModules(targetDir, answers);
+
+  // Generate PM2 configuration if enabled
+  if (answers.enablePM2tools) {
+    await generatePM2Config(targetDir, answers);
+  }
+
+  // Setup comprehensive unit testing if enabled
+  if (answers.enableUnitTesting) {
+    await setupUnitTesting(targetDir, answers);
+  }
+
+  // Install dependencies for NestJS template
+  console.log("📥 Installing dependencies...");
+  await installNestJSDependencies(targetDir, answers);
+}
+
+async function customizeNestJSPackageJson(targetDir, answers) {
+  const packageJsonPath = path.join(targetDir, "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+
+  packageJson.name = answers.appName;
+  packageJson.description = `${answers.appName} - A NestJS application`;
+
+  // Add PM2 scripts if enabled
+  if (answers.enablePM2tools) {
+    packageJson.scripts = {
+      ...packageJson.scripts,
+      "pm2:start": "pm2 start ecosystem.config.cjs",
+      "pm2:stop": "pm2 stop ecosystem.config.cjs",
+      "pm2:restart": "pm2 restart ecosystem.config.cjs",
+      "pm2:delete": "pm2 delete ecosystem.config.cjs"
+    };
+  }
+
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+}
+
+async function customizeNestJSEnvironment(targetDir, answers) {
+  const envExamplePath = path.join(targetDir, ".env.example");
+  let envContent = fs.readFileSync(envExamplePath, "utf8");
+
+  // Update app name in env
+  envContent = envContent.replace(/APP_NAME=.*/, `APP_NAME=${answers.appName}`);
+
+  // Add/remove auth-related variables based on selections
+  if (!answers.enableJwtAuth) {
+    // Comment out JWT-related variables if JWT is disabled
+    envContent = envContent.replace(/^JWT_SECRET=/, "#JWT_SECRET=");
+    envContent = envContent.replace(/^JWT_EXPIRES_IN=/, "#JWT_EXPIRES_IN=");
+  }
+
+  if (!answers.enableXSignature) {
+    // Comment out X-Signature variables
+    envContent = envContent.replace(/PRE_SHARED_API_KEY=.*/, `# PRE_SHARED_API_KEY=UPDATE_ME`);
+  }
+
+  // Update database configuration
+  switch (answers.db) {
+    case "PostgreSQL":
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=5432");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "DB_USERNAME=postgres");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "DB_PASSWORD=password");
+      envContent = envContent.replace(/DB_NAME=.*/, `DB_NAME=${answers.appName}`);
+      break;
+    case "MySQL":
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=3306");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "DB_USERNAME=root");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "DB_PASSWORD=password");
+      envContent = envContent.replace(/DB_NAME=.*/, `DB_NAME=${answers.appName}`);
+      break;
+    case "MSSQL":
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=1433");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "DB_USERNAME=sa");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "DB_PASSWORD=YourPassword123");
+      envContent = envContent.replace(/DB_NAME=.*/, `DB_NAME=${answers.appName}`);
+      break;
+    case "MongoDB":
+      // For MongoDB, we use different environment variables
+      envContent = envContent.replace(/DB_HOST=.*/, "DB_HOST=localhost");
+      envContent = envContent.replace(/DB_PORT=.*/, "DB_PORT=27017");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "# DB_USERNAME=admin");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "# DB_PASSWORD=password");
+      envContent = envContent.replace(/DB_NAME=.*/, `DB_NAME=${answers.appName}`);
+      // Add MongoDB connection string
+      if (!envContent.includes("DATABASE_URL")) {
+        envContent += `\nDATABASE_URL=mongodb://localhost:27017/${answers.appName}`;
+      } else {
+        envContent = envContent.replace(
+          /DATABASE_URL=.*/,
+          `DATABASE_URL=mongodb://localhost:27017/${answers.appName}`
+        );
+      }
+      break;
+    case "SQLite":
+      // SQLite doesn't need host, port, username, password
+      envContent = envContent.replace(/DB_HOST=.*/, "# DB_HOST=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_PORT=.*/, "# DB_PORT=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_USERNAME=.*/, "# DB_USERNAME=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_PASSWORD=.*/, "# DB_PASSWORD=not_required_for_sqlite");
+      envContent = envContent.replace(/DB_NAME=.*/, `DB_NAME=${answers.appName}.db`);
+      // Add SQLite database path
+      if (!envContent.includes("DATABASE_URL")) {
+        envContent += `\nDATABASE_URL=file:./${answers.appName}.db`;
+      } else {
+        envContent = envContent.replace(
+          /DATABASE_URL=.*/,
+          `DATABASE_URL=file:./${answers.appName}.db`
+        );
+      }
+      break;
+  }
+
+  fs.writeFileSync(envExamplePath, envContent);
+  fs.writeFileSync(path.join(targetDir, ".env"), envContent);
+}
+
+async function customizeNestJSAuthModules(targetDir, answers) {
+  // Find and customize auth modules based on template structure
+  const authModulePath = path.join(targetDir, "src/auth/auth.module.ts");
+  
+  if (fs.existsSync(authModulePath)) {
+    let authModuleContent = fs.readFileSync(authModulePath, "utf8");
+
+    if (!answers.enableJwtAuth) {
+      // Comment out JWT strategy imports and providers
+      authModuleContent = authModuleContent.replace(
+        /import.*JwtStrategy.*from.*/,
+        "// JWT authentication disabled\n// import { JwtStrategy } from './jwt.strategy';"
+      );
+    }
+
+    fs.writeFileSync(authModulePath, authModuleContent);
+  }
+
+  // Customize app module if exists
+  const appModulePath = path.join(targetDir, "src/app.module.ts");
+  if (fs.existsSync(appModulePath)) {
+    let appModuleContent = fs.readFileSync(appModulePath, "utf8");
+
+    if (!answers.enableJwtAuth) {
+      // Comment out JWT guard
+      appModuleContent = appModuleContent.replace(
+        /import.*JwtAuthGuard.*from.*/,
+        "// JWT authentication disabled\n// import { JwtAuthGuard } from './auth/jwt-auth.guard';"
+      );
+    }
+
+    fs.writeFileSync(appModulePath, appModuleContent);
+  }
+}
+
+async function generatePM2Config(targetDir, answers) {
+  const pm2Config = `module.exports = {
+  apps: [
+    {
+      name: '${answers.appName}',
+      script: 'dist/main.js',
+      instances: 'max',
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'development'
+      },
+      env_production: {
+        NODE_ENV: 'production'
+      },
+      watch: false,
+      ignore_watch: ['node_modules', 'logs'],
+      error_file: './logs/err.log',
+      out_file: './logs/out.log',
+      log_file: './logs/combined.log',
+      time: true,
+      max_memory_restart: '1G',
+      node_args: '--max_old_space_size=4096'
+    }
+  ]
+};`;
+
+  fs.writeFileSync(path.join(targetDir, "ecosystem.config.cjs"), pm2Config);
+  
+  // Create logs directory
+  fs.mkdirSync(path.join(targetDir, "logs"), { recursive: true });
+}
+
+async function setupUnitTesting(targetDir, answers) {
+  // Update Jest configuration for comprehensive testing
+  const jestConfigPath = path.join(targetDir, "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(jestConfigPath, "utf8"));
+
+  packageJson.jest = {
+    moduleFileExtensions: ['js', 'json', 'ts'],
+    rootDir: 'src',
+    testRegex: '.*\\.spec\\.ts$',
+    transform: {
+      '^.+\\.(t|j)s$': 'ts-jest'
+    },
+    collectCoverageFrom: [
+      '**/*.(t|j)s'
+    ],
+    coverageDirectory: '../coverage',
+    testEnvironment: 'node',
+    coverageReporters: ['text', 'lcov', 'html'],
+    coverageThreshold: {
+      global: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80
+      }
+    }
+  };
+
+  fs.writeFileSync(jestConfigPath, JSON.stringify(packageJson, null, 2));
+
+  // Create comprehensive test files for NestJS template
+  await createNestJSTestFiles(targetDir, answers);
+}
+
+async function createNestJSTestFiles(targetDir, answers) {
+  const testDir = path.join(targetDir, "src");
+  const e2eTestDir = path.join(targetDir, "test");
+  fs.ensureDirSync(e2eTestDir);
+
+  // App Controller Test
+  const appControllerTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+describe('AppController', () => {
+  let appController: AppController;
+
+  beforeEach(async () => {
+    const app: TestingModule = await Test.createTestingModule({
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
+
+    appController = app.get<AppController>(AppController);
+  });
+
+  describe('root', () => {
+    it('should return "Hello World!"', () => {
+      expect(appController.getHello()).toBe('Hello World!');
+    });
+  });
+});`;
+
+  if (!fs.existsSync(path.join(testDir, "app.controller.spec.ts"))) {
+    fs.writeFileSync(path.join(testDir, "app.controller.spec.ts"), appControllerTestContent);
+  }
+
+  // App Service Test
+  const appServiceTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { AppService } from './app.service';
+
+describe('AppService', () => {
+  let service: AppService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [AppService],
+    }).compile();
+
+    service = module.get<AppService>(AppService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  it('should return "Hello World!"', () => {
+    expect(service.getHello()).toBe('Hello World!');
+  });
+});`;
+
+  if (!fs.existsSync(path.join(testDir, "app.service.spec.ts"))) {
+    fs.writeFileSync(path.join(testDir, "app.service.spec.ts"), appServiceTestContent);
+  }
+
+  // E2E Test
+  const e2eTestContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import * as request from 'supertest';
+import { AppModule } from '../src/app.module';
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!');
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200);
+  });
+
+  ${answers.enableJwtAuth ? `
+  describe('Authentication', () => {
+    it('/auth/login (POST)', () => {
+      return request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'password123'
+        })
+        .expect(401); // Should fail without registered user
+    });
+
+    it('/auth/register (POST)', () => {
+      return request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'test@example.com',
+          password: 'password123'
+        })
+        .expect(201);
+    });
+  });
+  ` : ""}
+
+  ${answers.db ? `
+  describe('Database', () => {
+    it('/health/db (GET)', () => {
+      return request(app.getHttpServer())
+        .get('/health/db')
+        .expect(200);
+    });
+  });
+  ` : ""}
+});`;
+
+  fs.writeFileSync(path.join(e2eTestDir, "app.e2e-spec.ts"), e2eTestContent);
+
+  // Jest E2E Configuration
+  const jestE2eConfig = {
+    moduleFileExtensions: ['js', 'json', 'ts'],
+    rootDir: '.',
+    testEnvironment: 'node',
+    testRegex: '.e2e-spec.ts$',
+    transform: {
+      '^.+\\.(t|j)s$': 'ts-jest'
+    }
+  };
+
+  fs.writeFileSync(path.join(e2eTestDir, "jest-e2e.json"), JSON.stringify(jestE2eConfig, null, 2));
+
+  // Create test utilities
+  const testUtilsContent = `import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+
+export class TestUtils {
+  static async createTestApp(moduleMetadata: any): Promise<INestApplication> {
+    const moduleFixture: TestingModule = await Test.createTestingModule(moduleMetadata).compile();
+    
+    const app = moduleFixture.createNestApplication();
+    await app.init();
+    
+    return app;
+  }
+
+  static async closeApp(app: INestApplication): Promise<void> {
+    if (app) {
+      await app.close();
+    }
+  }
+
+  static generateTestUser() {
+    return {
+      email: \`test-\${Date.now()}@example.com\`,
+      password: 'password123'
+    };
+  }
+
+  static generateAuthHeaders(token: string) {
+    return {
+      Authorization: \`Bearer \${token}\`
+    };
+  }
+}`;
+
+  fs.writeFileSync(path.join(e2eTestDir, "test-utils.ts"), testUtilsContent);
+}
+
+async function installNestJSDependencies(targetDir, answers) {
+  // NestJS template uses npm for dependency management
+  try {
+    console.log("Installing NestJS template dependencies...");
+    
+    let additionalDeps = [];
+    
+    if (answers.enablePM2tools) {
+      additionalDeps.push("pm2");
+    }
+    
+    if (answers.enableUnitTesting) {
+      additionalDeps.push("@types/jest", "jest", "ts-jest", "supertest", "@types/supertest");
+    }
+    
+    if (additionalDeps.length > 0) {
+      const installCmd = `cd ${targetDir} && npm install ${additionalDeps.join(" ")} --save-dev`;
+      execSync(installCmd, { stdio: "inherit" });
+    }
+    
+    execSync(`cd ${targetDir} && npm install`, { stdio: "inherit" });
+  } catch (error) {
+    console.error("Error installing dependencies:", error.message);
+    console.log("You can install them manually by running:");
+    console.log(`cd ${path.basename(targetDir)}`);
+    console.log(`npm install`);
   }
 }
 

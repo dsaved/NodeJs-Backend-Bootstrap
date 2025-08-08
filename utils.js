@@ -374,8 +374,20 @@ async function createTestFiles(targetDir, answers, ext) {
     testMatch: ["**/__tests__/**/*.(js|ts)", "**/*.(test|spec).(js|ts)"],
     collectCoverageFrom: [
       "src/**/*.(js|ts)",
-      "!src/**/*.d.ts"
-    ]
+      "!src/**/*.d.ts",
+      "!src/main.(js|ts)",
+      "!src/index.(js|ts)"
+    ],
+    coverageDirectory: "coverage",
+    coverageReporters: ["text", "lcov", "html"],
+    coverageThreshold: {
+      global: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80
+      }
+    }
   };
 
   if (isTs) {
@@ -383,6 +395,7 @@ async function createTestFiles(targetDir, answers, ext) {
     jestConfig.transform = {
       "^.+\\.ts$": "ts-jest"
     };
+    jestConfig.moduleFileExtensions = ['js', 'json', 'ts'];
   }
 
   fs.writeFileSync(
@@ -404,6 +417,17 @@ describe('API Tests', () => {
       expect(response.body).toHaveProperty('message');
       expect(response.body.message).toContain('Welcome');
       expect(response.body).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('Health Check', () => {
+    it('should return health status', async () => {
+      const response = await request(app)
+        .get('/health')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('status');
+      expect(response.body.status).toBe('OK');
     });
   });
 
@@ -517,12 +541,191 @@ describe('API Tests', () => {
       });
       ` : ""}
     });
+
+    describe('Protected Routes', () => {
+      let authToken;
+
+      beforeAll(async () => {
+        // Register and login to get auth token
+        const userData = {
+          email: 'protected@example.com',
+          password: 'password123',
+          confirmPassword: 'password123'
+        };
+
+        await request(app)
+          .post('/api/auth/register')
+          .send(userData);
+
+        const loginResponse = await request(app)
+          .post('/api/auth/login')
+          .send({
+            email: userData.email,
+            password: userData.password
+          });
+
+        authToken = loginResponse.body.token;
+      });
+
+      it('should access protected route with valid token', async () => {
+        await request(app)
+          .get('/api/users/profile')
+          .set('Authorization', \`Bearer \${authToken}\`)
+          .expect(200);
+      });
+
+      it('should not access protected route without token', async () => {
+        await request(app)
+          .get('/api/users/profile')
+          .expect(401);
+      });
+
+      it('should not access protected route with invalid token', async () => {
+        await request(app)
+          .get('/api/users/profile')
+          .set('Authorization', 'Bearer invalid-token')
+          .expect(401);
+      });
+    });
+  });
+  ` : ""}
+
+  ${answers.enableValidation ? `
+  describe('Validation Tests', () => {
+    it('should validate request body schema', async () => {
+      const invalidData = {
+        email: 'not-an-email',
+        password: '123' // too short
+      };
+
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send(invalidData)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('Validation');
+    });
+
+    it('should validate pagination parameters', async () => {
+      const response = await request(app)
+        .get('/api/users?page=0&limit=200') // invalid pagination
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+    });
+  });
+  ` : ""}
+
+  describe('Error Handling', () => {
+    it('should handle 404 for non-existent routes', async () => {
+      await request(app)
+        .get('/api/non-existent-route')
+        .expect(404);
+    });
+
+    it('should handle malformed JSON', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .set('Content-Type', 'application/json')
+        .send('{"invalid": json}')
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  ${answers.orm && answers.orm !== 'None' ? `
+  describe('Database Tests', () => {
+    it('should connect to database', async () => {
+      // Test database connection
+      const response = await request(app)
+        .get('/api/health/db')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('database');
+      expect(response.body.database).toBe('connected');
+    });
+  });
+  ` : ""}
+});
+
+// Unit tests for utility functions
+describe('Utility Functions', () => {
+  ${answers.enableLogging ? `
+  describe('Logger', () => {
+    const { logger } = require('../src/utils/logger');
+
+    it('should log info messages', () => {
+      expect(() => logger.info('Test info message')).not.toThrow();
+    });
+
+    it('should log error messages', () => {
+      expect(() => logger.error('Test error message')).not.toThrow();
+    });
+  });
+  ` : ""}
+
+  ${answers.enableValidation ? `
+  describe('Validation Utils', () => {
+    const { userSchemas } = require('../src/utils/validation');
+
+    it('should validate correct user registration data', () => {
+      const validData = {
+        email: 'test@example.com',
+        password: 'password123',
+        confirmPassword: 'password123'
+      };
+
+      const { error } = userSchemas.register.validate(validData);
+      expect(error).toBeUndefined();
+    });
+
+    it('should reject invalid email format', () => {
+      const invalidData = {
+        email: 'invalid-email',
+        password: 'password123',
+        confirmPassword: 'password123'
+      };
+
+      const { error } = userSchemas.register.validate(invalidData);
+      expect(error).toBeDefined();
+    });
   });
   ` : ""}
 });
 `;
 
   fs.writeFileSync(path.join(testDir, `app.test.${ext}`), testContent);
+
+  // Create test setup file
+  const setupContent = `${isTs ? '// Test setup file' : '// Test setup file'}
+const { execSync } = require('child_process');
+
+// Global test setup
+beforeAll(() => {
+  // Setup test database or other global resources
+  process.env.NODE_ENV = 'test';
+  ${answers.orm && answers.orm !== 'None' ? "process.env.DATABASE_URL = 'file:./test.db';" : ""}
+});
+
+// Global test teardown
+afterAll(() => {
+  // Cleanup test resources
+  ${answers.orm && answers.orm !== 'None' ? `
+  try {
+    execSync('rm -f test.db');
+  } catch (error) {
+    // Ignore cleanup errors
+  }
+  ` : ""}
+});
+
+// Jest global configuration
+jest.setTimeout(10000); // 10 second timeout for all tests
+`;
+
+  fs.writeFileSync(path.join(testDir, `setup.${ext}`), setupContent);
 }
 
 module.exports = {
