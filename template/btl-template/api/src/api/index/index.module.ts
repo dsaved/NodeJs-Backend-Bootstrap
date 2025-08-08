@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { HelloController } from './index.controller';
+import { IndexService } from './index.service';
+import * as MODELS from '../../model';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Tokens } from 'src/helpers/token';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([...Object.values(MODELS)])],
+  controllers: [HelloController],
+  providers: [IndexService, Tokens],
+})
+export class IndexModule {}
