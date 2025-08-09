@@ -1,5 +1,5 @@
 import { classes, interfaces } from '../constructs';
-import awsS3bucket from '../helpers/aws.s3';
+import awsS3bucket from './aws.s3';
 import * as CryptoJS from 'crypto-js';
 
 export const getPagination = (

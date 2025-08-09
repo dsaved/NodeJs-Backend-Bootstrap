@@ -5,6 +5,9 @@ install:
 add:
 	yarn --cwd api add ${name}
 
+build:
+	yarn --cwd api build
+
 dev-start:
 	yarn --cwd api start:dev
 

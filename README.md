@@ -1,8 +1,16 @@
 # Node.js Backend Bootstrap CLI
 
-🚀 A powerful CLI tool to quickly scaffold Node.js backend projects with your preferred technology stack.
+🚀 A powerful CLI tool to quickly scaffold Node.js backend pro## 🛠️ Development Setup (For Contributors)
+
+**Prerequisites:** Node.js 22.0.0 or higher
+
+If you want to contribute to this project or run it locally:ts with your preferred technology stack.
 
 ## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js 22.0.0 or higher** is required to run this CLI tool
 
 ### Installation
 
@@ -25,7 +33,7 @@ npx nodejs-bootstrapper
 ```
 
 The CLI will guide you through an interactive setup to configure your project with:
-- **Template selection** (Basic, NestJS, or Enterprise NestJS)
+- **Template selection** (Basic, NestJS, or Enterprise API)
 - **Framework choice** (Express, Fastify, Koa, NestJS)
 - **Database & ORM** (PostgreSQL, MySQL, MongoDB, etc. with TypeORM, Sequelize, or Prisma)
 - **Authentication options** (JWT, X-Signature)
@@ -57,36 +65,35 @@ $ init-project
 
 - **Basic Template** - Customizable Node.js project with framework selection
 - **NestJS Template** - Modern NestJS application with essential features
-- **BTL Template (Enterprise NestJS)** - Production-ready NestJS application with enterprise features
+- **Enterprise API (NestJS)** - Production-ready NestJS application with enterprise features
 
 ### 🛠️ **Framework Support**
 
 - **Express.js** - Fast, unopinionated web framework *(Basic Template)*
 - **Fastify** - High-performance, low-overhead framework *(Basic Template)*
 - **Koa.js** - Modern, lightweight framework *(Basic Template)*
-- **NestJS** - Progressive Node.js framework *(NestJS & BTL Templates)*
+- **NestJS** - Progressive Node.js framework *(NestJS & Enterprise API Templates)*
 
 ### 🗄️ **Database & ORM**
 
 - **Databases**: PostgreSQL, MySQL, MSSQL, MongoDB, SQLite
-- **ORMs**: TypeORM *(NestJS & BTL Templates)*, Sequelize, Prisma *(Basic Template)*
+- **ORMs**: TypeORM *(NestJS & Enterprise API Templates)*, Sequelize, Prisma *(Basic Template)*
 - **Auto-configuration** with environment variables and connection strings
 - **Database-specific optimizations** (connection strings for MongoDB/SQLite, standard configs for SQL databases)
 
 ### 🔐 **Authentication**
 
 - **JWT Authentication** with bcrypt password hashing
-- **X-Signature Authentication** for API security *(NestJS & BTL Templates)*
+- **X-Signature Authentication** for API security *(NestJS & Enterprise API Templates)*
 - **Configurable guards** and middleware
 - **Mutual exclusivity** - Choose between authentication methods based on your needs
 
 ### 🔧 **Development Features**
 
 - **TypeScript/JavaScript** support *(Basic Template)*
-- **TypeScript** by default *(NestJS & BTL Templates)*
+- **TypeScript** by default *(NestJS & Enterprise API Templates)*
 - **Request Validation** (Joi, Zod, class-validator)
 - **Logging** with Winston *(Basic Template)* or NestJS Logger
-- **Comprehensive Testing** with Jest and coverage reporting
 - **PM2 Process Management** OR **Docker** configuration *(mutually exclusive)*
 - **ESLint & Prettier** setup
 
@@ -111,14 +118,14 @@ node src/init.js
 The CLI will guide you through project configuration:
 
 1. **Application name** - Your project name
-2. **Template type** - Basic, NestJS, or BTL (Enterprise NestJS)
+2. **Template type** - Basic, NestJS, or Enterprise API
 3. **Framework** - Express.js, Fastify, Koa.js *(Basic Template only)*
 4. **Database** - PostgreSQL, MySQL, MSSQL, MongoDB, SQLite
 5. **ORM** - TypeORM, Sequelize, Prisma *(Basic Template only)*
 6. **Language** - TypeScript or JavaScript *(Basic Template only)*
 7. **Authentication** - JWT and/or X-Signature options
-8. **Process Management** - PM2 tools *(NestJS & BTL Templates)*
-9. **Testing Setup** - Comprehensive unit testing *(NestJS & BTL Templates)*
+8. **Process Management** - PM2 tools *(NestJS & Enterprise API Templates)*
+9. **Testing Setup** - Comprehensive unit testing *(NestJS & Enterprise API Templates)*
 10. **Deployment** - Docker configuration (when PM2 is not selected)
 
 ### After Generation
@@ -133,7 +140,7 @@ npm run dev
 # NestJS Template
 npm run start:dev
 
-# BTL Template (Enterprise NestJS)
+# Enterprise API (NestJS)
 make dev-start
 ```
 
@@ -172,7 +179,7 @@ my-app/
 └── package.json           # Dependencies
 ```
 
-### BTL Template Structure
+### Enterprise API Structure
 
 ```text
 my-app/
@@ -208,7 +215,7 @@ my-app/
 - `npm run pm2:start` - Start with PM2 (if enabled)
 - `npm run pm2:stop` - Stop PM2 processes (if enabled)
 
-### BTL Template
+### Enterprise API
 
 - `make install` - Install all dependencies
 - `make dev-start` - Start development server
@@ -265,7 +272,7 @@ JWT_EXPIRES_IN=7d                   # If JWT enabled
 PRE_SHARED_API_KEY=your-api-key     # If X-Signature enabled
 ```
 
-**BTL Template:**
+**Enterprise API:**
 
 ```env
 APP_NAME=my-app
@@ -316,9 +323,9 @@ SMTP_PASS=your-app-password
 - ✅ **Guards & Middleware** - Request/response interceptors
 - ✅ **Modular Architecture** - Feature-based module structure
 
-### BTL Template (Enterprise NestJS)
+### Enterprise API (NestJS)
 
-The BTL Template is a production-ready NestJS application that includes:
+The Enterprise API is a production-ready NestJS application that includes:
 
 ### Core Features
 
@@ -371,8 +378,8 @@ The ORM implementation includes comprehensive validation and testing through the
 
 **🏗️ Major Template Restructuring:**
 - **Added NestJS Template** - New standalone NestJS template option
-- **Enhanced BTL Template** - Now called "BTL Template (Enterprise NestJS)"
-- **Template Organization** - Moved to `template/basic/`, `template/nestjs/`, `template/btl-template/`
+- **Enhanced Enterprise API** - Now called "Enterprise API (NestJS)"
+- **Template Organization** - Moved to `template/basic/`, `template/nestjs/`, `template/enterprise-template/`
 
 **🗄️ Comprehensive Database Support:**
 - **Complete Database Coverage** - All 5 databases (PostgreSQL, MySQL, MSSQL, MongoDB, SQLite) now fully supported
@@ -393,7 +400,7 @@ The ORM implementation includes comprehensive validation and testing through the
 **🧪 Testing & Quality:**
 - **Jest Integration** - Comprehensive test suites for all templates
 - **Coverage Reporting** - 80% coverage thresholds with HTML reports
-- **E2E Testing** - End-to-end tests for NestJS and BTL templates
+- **E2E Testing** - End-to-end tests for NestJS and Enterprise API templates
 - **Template-Specific Tests** - Tests adapted to your feature selections
 
 ## 🤝 Contributing
@@ -412,10 +419,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter any issues:
 
-1. Check the generated project's README.md
-2. Review environment variables in `.env.example`
-3. Ensure all dependencies are installed
-4. Create an issue with detailed information
+1. **Verify Node.js version** - Ensure you have Node.js 22.0.0 or higher installed
+2. Check the generated project's README.md
+3. Review environment variables in `.env.example`
+4. Ensure all dependencies are installed
+5. Create an issue with detailed information
 
 ---
 

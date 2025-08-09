@@ -38,7 +38,7 @@ async function main() {
       choices: [
         "Basic Template",
         "NestJS Template", 
-        "BTL Template (Enterprise NestJS)"
+        "Enterprise API (NestJS)"
       ],
       default: "Basic Template",
     },
@@ -59,7 +59,7 @@ async function main() {
       when: (answers) => 
         answers.template === "Basic Template" ||
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "list",
@@ -70,7 +70,7 @@ async function main() {
       when: (answers) =>
         (answers.orm !== "None" && answers.template === "Basic Template") ||
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "list",
@@ -94,7 +94,7 @@ async function main() {
       default: true,
       when: (answers) => 
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "confirm",
@@ -103,7 +103,7 @@ async function main() {
       default: true,
       when: (answers) => 
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "confirm",
@@ -112,7 +112,7 @@ async function main() {
       default: false,
       when: (answers) => 
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "confirm",
@@ -121,7 +121,7 @@ async function main() {
       default: true,
       when: (answers) => 
         answers.template === "NestJS Template" ||
-        answers.template === "BTL Template (Enterprise NestJS)",
+        answers.template === "Enterprise API (NestJS)",
     },
     {
       type: "confirm",
@@ -175,8 +175,8 @@ async function main() {
 
   // Choose template directory based on selection
   let templateDir;
-  if (answers.template === "BTL Template (Enterprise NestJS)") {
-    templateDir = path.join(__dirname, "..", "template", "btl-template");
+  if (answers.template === "Enterprise API (NestJS)") {
+    templateDir = path.join(__dirname, "..", "template", "enterprise-template");
   } else if (answers.template === "NestJS Template") {
     templateDir = path.join(__dirname, "..", "template", "nestjs");
   } else {
@@ -185,14 +185,14 @@ async function main() {
 
   fs.copySync(templateDir, targetDir);
 
-  // Copy selected ORM models for NestJS and BTL templates
-  if (answers.template === "NestJS Template" || answers.template === "BTL Template (Enterprise NestJS)") {
+  // Copy selected ORM models for NestJS and Enterprise API templates
+  if (answers.template === "NestJS Template" || answers.template === "Enterprise API (NestJS)") {
     await copySelectedORMModels(targetDir, answers);
   }
 
   // Handle different template types
-  if (answers.template === "BTL Template (Enterprise NestJS)") {
-    await customizeBTLTemplate(targetDir, answers);
+  if (answers.template === "Enterprise API (NestJS)") {
+    await customizeEnterpriseAPITemplate(targetDir, answers);
   } else if (answers.template === "NestJS Template") {
     await customizeNestJSTemplate(targetDir, answers);
   } else {
@@ -207,7 +207,7 @@ async function main() {
   console.log(`\n📋 Next steps:`);
   console.log(`   cd ${answers.appName}`);
 
-  if (answers.template === "BTL Template (Enterprise NestJS)") {
+  if (answers.template === "Enterprise API (NestJS)") {
     console.log(`   make dev-start`);
     console.log(`\n🔧 Configuration:`);
     
@@ -374,7 +374,7 @@ async function copySelectedORMModels(targetDir, answers) {
   console.log(`🔄 Setting up ${answers.orm} models...`);
   
   const isNestJS = answers.template === "NestJS Template";
-  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const isBTL = answers.template === "Enterprise API (NestJS)";
   
   // Determine model directories
   let sourceModelsDir, targetModelsDir;
@@ -409,7 +409,7 @@ async function copySelectedORMModels(targetDir, answers) {
     // For Prisma, copy the schema file to the project root
     const prismaSchemaSource = path.join(sourceOrmDir, "schema.prisma");
     const templatePrismaSchema = isBTL 
-      ? path.join(__dirname, "../template/btl-template/prisma.schema")
+      ? path.join(__dirname, "../template/enterprise-template/prisma.schema")
       : path.join(__dirname, "../template/nestjs/prisma.schema");
     const prismaDir = path.join(targetDir, "prisma");
     const prismaSchemaTarget = path.join(prismaDir, "schema.prisma");
@@ -474,7 +474,7 @@ async function copySelectedORMModels(targetDir, answers) {
 async function createSequelizeConfigFiles(targetDir, answers) {
   console.log('🔄 Creating Sequelize configuration files...');
   
-  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const isBTL = answers.template === "Enterprise API (NestJS)";
   const configDir = isBTL ? path.join(targetDir, 'api', 'src', 'config') : path.join(targetDir, 'src', 'config');
 
   // Create .sequelizerc file in project root
@@ -491,7 +491,7 @@ module.exports = {
   await fs.writeFile(path.join(targetDir, '.sequelizerc'), sequelizeRcContent);
   console.log('✅ Created .sequelizerc configuration file');
 
-  // For BTL template, also create .sequelizerc in api directory with relative paths
+  // For Enterprise API template, also create .sequelizerc in api directory with relative paths
   if (isBTL) {
     const apiSequelizeRcContent = `const path = require('path');
 
@@ -555,7 +555,7 @@ async function generateInitialMigration(targetDir, answers) {
   console.log(`🔄 Generating initial migration for ${answers.orm}...`);
   
   const isNestJS = answers.template === "NestJS Template";
-  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const isBTL = answers.template === "Enterprise API (NestJS)";
   
   // Determine migration directory
   let migrationDir;
@@ -588,12 +588,12 @@ async function generateInitialMigration(targetDir, answers) {
 
 async function generateTypeORMMigration(migrationDir, timestamp, answers) {
   const migrationName = `${timestamp}-InitialMigration`;
-  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const isBTL = answers.template === "Enterprise API (NestJS)";
   
   let tableCreation, indexCreation, tableDrop;
   
   if (isBTL) {
-    // BTL Template with comprehensive models matching actual model definitions
+    // Enterprise API template with comprehensive models matching actual model definitions
     tableCreation = `
         // Countries table
         await queryRunner.query(\`
@@ -916,12 +916,12 @@ export class InitialMigration${timestamp} implements MigrationInterface {
 
 async function generateSequelizeMigration(migrationDir, timestamp, answers) {
   const migrationName = `${timestamp}-initial-migration.js`;
-  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const isBTL = answers.template === "Enterprise API (NestJS)";
   
   let migrationContent;
   
   if (isBTL) {
-    // BTL Template with comprehensive models using auto-increment integers
+    // Enterprise API template with comprehensive models using auto-increment integers
     migrationContent = `'use strict';
 
 /** @type {import('sequelize-cli').Migration} */
@@ -1232,37 +1232,37 @@ npx prisma migrate dev --name initial_migration
   fs.writeFileSync(path.join(migrationDir, "README.md"), migrationReadme);
 }
 
-async function customizeBTLTemplate(targetDir, answers) {
-  // Customize package.json for BTL template
-  await customizeBTLPackageJson(targetDir, answers);
+async function customizeEnterpriseAPITemplate(targetDir, answers) {
+  // Customize package.json for Enterprise API template
+  await customizeEnterpriseAPIPackageJson(targetDir, answers);
 
   // Customize environment variables
-  await customizeBTLEnvironment(targetDir, answers);
+  await customizeEnterpriseAPIEnvironment(targetDir, answers);
 
   // Customize auth guards based on selections
-  await customizeBTLAuthGuards(targetDir, answers);
+  await customizeEnterpriseAPIAuthGuards(targetDir, answers);
 
   // Generate PM2 configuration if enabled
   if (answers.enablePM2tools) {
-    await generateBTLPM2Config(targetDir, answers);
+    await generateEnterpriseAPIPM2Config(targetDir, answers);
   }
 
   // Setup comprehensive unit testing if enabled
   if (answers.enableUnitTesting) {
-    await setupBTLUnitTesting(targetDir, answers);
+    await setupEnterpriseAPIUnitTesting(targetDir, answers);
   }
 
-  // Install dependencies for BTL template
+  // Install dependencies for Enterprise API template
   console.log("📥 Installing dependencies...");
-  await installBTLDependencies(targetDir, answers);
+  await installEnterpriseAPIDependencies(targetDir, answers);
 }
 
-async function customizeBTLPackageJson(targetDir, answers) {
+async function customizeEnterpriseAPIPackageJson(targetDir, answers) {
   const packageJsonPath = path.join(targetDir, "api/package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
   packageJson.name = answers.appName;
-  packageJson.description = `${answers.appName} - A NestJS application based on BTL template`;
+  packageJson.description = `${answers.appName} - A NestJS application based on Enterprise API template`;
 
   // Update ORM dependencies based on selection
   if (answers.orm !== "TypeORM") {
@@ -1379,7 +1379,7 @@ async function customizeBTLPackageJson(targetDir, answers) {
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 }
 
-async function customizeBTLEnvironment(targetDir, answers) {
+async function customizeEnterpriseAPIEnvironment(targetDir, answers) {
   const envExamplePath = path.join(targetDir, "api/.env.example");
   let envContent = fs.readFileSync(envExamplePath, "utf8");
 
@@ -1479,7 +1479,7 @@ async function customizeBTLEnvironment(targetDir, answers) {
   fs.writeFileSync(path.join(targetDir, "api/.env"), envContent);
 }
 
-async function customizeBTLAuthGuards(targetDir, answers) {
+async function customizeEnterpriseAPIAuthGuards(targetDir, answers) {
   const appModulePath = path.join(targetDir, "api/src/app.module.ts");
   let appModuleContent = fs.readFileSync(appModulePath, "utf8");
 
@@ -1615,10 +1615,10 @@ ${
   fs.writeFileSync(envPath, envContent);
 }
 
-async function installBTLDependencies(targetDir, answers) {
-  // BTL template uses Makefile for dependency management
+async function installEnterpriseAPIDependencies(targetDir, answers) {
+  // Enterprise API template uses Makefile for dependency management
   try {
-    console.log("Installing BTL template dependencies using Makefile...");
+    console.log("Installing Enterprise API template dependencies using Makefile...");
     execSync(`cd ${targetDir} && make install`, { stdio: "inherit" });
   } catch (error) {
     console.error("Error installing dependencies:", error.message);
@@ -1628,7 +1628,7 @@ async function installBTLDependencies(targetDir, answers) {
   }
 }
 
-async function generateBTLPM2Config(targetDir, answers) {
+async function generateEnterpriseAPIPM2Config(targetDir, answers) {
   const pm2Config = `module.exports = {
   apps: [
     {
@@ -1711,7 +1711,7 @@ pm2-logs:
   }
 }
 
-async function setupBTLUnitTesting(targetDir, answers) {
+async function setupEnterpriseAPIUnitTesting(targetDir, answers) {
   // Update package.json for comprehensive testing
   const apiPackageJsonPath = path.join(targetDir, "api/package.json");
   const apiPackageJson = JSON.parse(fs.readFileSync(apiPackageJsonPath, "utf8"));
@@ -1754,8 +1754,8 @@ async function setupBTLUnitTesting(targetDir, answers) {
 
   fs.writeFileSync(apiPackageJsonPath, JSON.stringify(apiPackageJson, null, 2));
 
-  // Create comprehensive test files for BTL template
-  await createBTLTestFiles(targetDir, answers);
+  // Create comprehensive test files for Enterprise API template
+  await createEnterpriseAPITestFiles(targetDir, answers);
 
   // Update Makefile with test commands
   const makefilePath = path.join(targetDir, "Makefile");
@@ -1782,7 +1782,7 @@ test-e2e:
   }
 }
 
-async function createBTLTestFiles(targetDir, answers) {
+async function createEnterpriseAPITestFiles(targetDir, answers) {
   const apiTestDir = path.join(targetDir, "api/src");
   const e2eTestDir = path.join(targetDir, "api/test");
   fs.ensureDirSync(e2eTestDir);
@@ -1868,7 +1868,7 @@ describe('AppService', () => {
 
   fs.writeFileSync(path.join(apiTestDir, "app.service.spec.ts"), appServiceTestContent);
 
-  // E2E Test for BTL Template
+  // E2E Test for Enterprise API Template
   const e2eTestContent = `import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
@@ -1987,7 +1987,7 @@ describe('AppController (e2e)', () => {
 
   fs.writeFileSync(path.join(e2eTestDir, "app.e2e-spec.ts"), e2eTestContent);
 
-  // Jest E2E Configuration for BTL
+  // Jest E2E Configuration for Enterprise API
   const jestE2eConfig = {
     moduleFileExtensions: ['js', 'json', 'ts'],
     rootDir: '.',
@@ -2001,11 +2001,11 @@ describe('AppController (e2e)', () => {
 
   fs.writeFileSync(path.join(e2eTestDir, "jest-e2e.json"), JSON.stringify(jestE2eConfig, null, 2));
 
-  // Test setup for BTL
+  // Test setup for Enterprise API
   const testSetupContent = `import { Test } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 
-// Global test setup for BTL template
+// Global test setup for Enterprise API template
 beforeAll(async () => {
   // Set test environment variables
   process.env.NODE_ENV = 'test';
@@ -3575,4 +3575,4 @@ main().catch((err) => {
 });
 
 // Export for testing
-module.exports = { customizeBTLAuthGuards };
+module.exports = { customizeEnterpriseAPIAuthGuards };
