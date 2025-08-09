@@ -56,7 +56,7 @@ jobs:
           echo "Current version: $CURRENT_VERSION"
           
           # Check if this version exists on npm
-          if npm view project-bootstrapper@$CURRENT_VERSION version 2>/dev/null; then
+          if npm view nodejs-bootstrapper@$CURRENT_VERSION version 2>/dev/null; then
             echo "Version $CURRENT_VERSION already exists on npm"
             echo "should_publish=false" >> $GITHUB_OUTPUT
           else
@@ -91,7 +91,7 @@ jobs:
 
           ### Installation
           \`\`\`bash
-          npm install -g project-bootstrapper@${{ steps.version-check.outputs.version }}
+          npm install -g nodejs-bootstrapper@${{ steps.version-check.outputs.version }}
           \`\`\`
 
           ### Usage
@@ -101,7 +101,7 @@ jobs:
 
           Or use with npx:
           \`\`\`bash
-          npx project-bootstrapper@${{ steps.version-check.outputs.version }}
+          npx nodejs-bootstrapper@${{ steps.version-check.outputs.version }}
           \`\`\`"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,8 +109,8 @@ jobs:
       - name: Notify on success
         if: steps.version-check.outputs.should_publish == 'true' && matrix.node-version == '20.x'
         run: |
-          echo "✅ Successfully published project-bootstrapper@${{ steps.version-check.outputs.version }} to NPM!"
-          echo "📦 Package URL: https://www.npmjs.com/package/project-bootstrapper"
+          echo "✅ Successfully published nodejs-bootstrapper@${{ steps.version-check.outputs.version }} to NPM!"
+          echo "📦 Package URL: https://www.npmjs.com/package/nodejs-bootstrapper"
           echo "🏷️  GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version-check.outputs.version }}"
 
       - name: Skip publishing (version exists)

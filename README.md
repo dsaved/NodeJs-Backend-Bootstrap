@@ -2,6 +2,55 @@
 
 🚀 A powerful CLI tool to quickly scaffold Node.js backend projects with your preferred technology stack.
 
+## 🚀 Quick Start
+
+### Installation
+
+Install globally via npm:
+
+```bash
+npm install -g nodejs-bootstrapper
+```
+
+### Usage
+
+After installation, you can create a new project anywhere:
+
+```bash
+# Create a new project
+init-project
+
+# Or use with npx (no installation required)
+npx nodejs-bootstrapper
+```
+
+The CLI will guide you through an interactive setup to configure your project with:
+- **Template selection** (Basic, NestJS, or Enterprise NestJS)
+- **Framework choice** (Express, Fastify, Koa, NestJS)
+- **Database & ORM** (PostgreSQL, MySQL, MongoDB, etc. with TypeORM, Sequelize, or Prisma)
+- **Authentication options** (JWT, X-Signature)
+- **Development tools** (TypeScript/JavaScript, testing, Docker, PM2)
+
+### Example
+
+```bash
+$ init-project
+? What is your application name? my-awesome-api
+? Select a template: Basic Template
+? Select a framework: Express.js
+? Select a database: PostgreSQL
+? Select an ORM: TypeORM
+? Select a language: TypeScript
+? Do you want JWT authentication? Yes
+? Do you want request validation? Yes (Joi)
+? Do you want PM2 process management? No
+? Do you want Docker configuration? Yes
+
+✅ Project created successfully!
+📁 Navigate to: cd my-awesome-api
+🚀 Start development: npm run dev
+```
+
 ## ✨ Key Features
 
 ### 📋 **Template Options**
@@ -41,9 +90,9 @@
 - **PM2 Process Management** OR **Docker** configuration *(mutually exclusive)*
 - **ESLint & Prettier** setup
 
-## 🚀 Installation & Usage
+## �️ Development Setup (For Contributors)
 
-### Quick Start
+If you want to contribute to this project or run it locally:
 
 ```bash
 # Clone the repository
@@ -53,8 +102,8 @@ cd NodeJs-Backend-Bootstrap
 # Install dependencies
 npm install
 
-# Run the CLI
-node init.js
+# Run the CLI locally
+node src/init.js
 ```
 
 ### Interactive Setup

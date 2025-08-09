@@ -1,6 +1,6 @@
 {
-  "name": "project-bootstrapper",
-  "version": "1.0.3",
+  "name": "nodejs-bootstrapper",
+  "version": "1.0.4",
   "description": "A custom Node.js project bootstrapper with ORM and database selection",
   "main": "src/init.js",
   "bin": {
