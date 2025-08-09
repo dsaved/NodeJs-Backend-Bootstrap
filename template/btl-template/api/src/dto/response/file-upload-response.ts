@@ -1,4 +1,4 @@
-import { ApplicationFile } from '../../model/application-files.model';
+import { ApplicationFile } from '../../model';
 
 export class FileUploadResponseDto {
   fileName: string;

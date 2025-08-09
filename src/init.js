@@ -56,7 +56,10 @@ async function main() {
       message: "Select the ORM:",
       choices: ["TypeORM", "Sequelize", "Prisma", "None"],
       default: "TypeORM",
-      when: (answers) => answers.template === "Basic Template",
+      when: (answers) => 
+        answers.template === "Basic Template" ||
+        answers.template === "NestJS Template" ||
+        answers.template === "BTL Template (Enterprise NestJS)",
     },
     {
       type: "list",
@@ -173,14 +176,19 @@ async function main() {
   // Choose template directory based on selection
   let templateDir;
   if (answers.template === "BTL Template (Enterprise NestJS)") {
-    templateDir = path.join(__dirname, "template", "btl-template");
+    templateDir = path.join(__dirname, "..", "template", "btl-template");
   } else if (answers.template === "NestJS Template") {
-    templateDir = path.join(__dirname, "template", "nestjs");
+    templateDir = path.join(__dirname, "..", "template", "nestjs");
   } else {
-    templateDir = path.join(__dirname, "template", "basic");
+    templateDir = path.join(__dirname, "..", "template", "basic");
   }
 
   fs.copySync(templateDir, targetDir);
+
+  // Copy selected ORM models for NestJS and BTL templates
+  if (answers.template === "NestJS Template" || answers.template === "BTL Template (Enterprise NestJS)") {
+    await copySelectedORMModels(targetDir, answers);
+  }
 
   // Handle different template types
   if (answers.template === "BTL Template (Enterprise NestJS)") {
@@ -362,6 +370,868 @@ async function customizeBasicTemplate(targetDir, answers) {
   await installDependencies(targetDir, answers);
 }
 
+async function copySelectedORMModels(targetDir, answers) {
+  console.log(`🔄 Setting up ${answers.orm} models...`);
+  
+  const isNestJS = answers.template === "NestJS Template";
+  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  
+  // Determine model directories
+  let sourceModelsDir, targetModelsDir;
+  
+  if (isBTL) {
+    sourceModelsDir = path.join(targetDir, "api/src/model");
+    targetModelsDir = path.join(targetDir, "api/src/model");
+  } else if (isNestJS) {
+    sourceModelsDir = path.join(targetDir, "src/model");
+    targetModelsDir = path.join(targetDir, "src/model");
+  }
+  
+  // Map ORM choice to folder name
+  const ormFolderMap = {
+    "TypeORM": "typeorm",
+    "Sequelize": "sequelize", 
+    "Prisma": "prisma",
+    "None": "interfaces"
+  };
+  
+  const selectedORMFolder = ormFolderMap[answers.orm];
+  const sourceOrmDir = path.join(sourceModelsDir, selectedORMFolder);
+  
+  // Check if the ORM-specific folder exists
+  if (!fs.existsSync(sourceOrmDir)) {
+    console.log(`⚠️  Warning: ${answers.orm} models not found at ${sourceOrmDir}`);
+    return;
+  }
+  
+  // Copy selected ORM models to the model directory
+  if (answers.orm === "Prisma") {
+    // For Prisma, copy the schema file to the project root
+    const prismaSchemaSource = path.join(sourceOrmDir, "schema.prisma");
+    const templatePrismaSchema = isBTL 
+      ? path.join(__dirname, "../template/btl-template/prisma.schema")
+      : path.join(__dirname, "../template/nestjs/prisma.schema");
+    const prismaDir = path.join(targetDir, "prisma");
+    const prismaSchemaTarget = path.join(prismaDir, "schema.prisma");
+    
+    // Copy from ORM-specific folder if it exists, otherwise use template default
+    let schemaSource = prismaSchemaSource;
+    if (!fs.existsSync(prismaSchemaSource) && fs.existsSync(templatePrismaSchema)) {
+      schemaSource = templatePrismaSchema;
+    }
+    
+    if (fs.existsSync(schemaSource)) {
+      fs.ensureDirSync(prismaDir);
+      fs.copyFileSync(schemaSource, prismaSchemaTarget);
+      console.log(`✅ Copied Prisma schema to ./prisma/schema.prisma`);
+    }
+  } else {
+    // For other ORMs, copy model files directly to the model directory
+    const files = fs.readdirSync(sourceOrmDir);
+    
+    for (const file of files) {
+      if (file === "index.ts" || file.endsWith(".model.ts")) {
+        const sourceFile = path.join(sourceOrmDir, file);
+        const targetFile = path.join(targetModelsDir, file);
+        
+        // Read file content and fix import paths
+        let content = fs.readFileSync(sourceFile, 'utf8');
+        
+        // Fix import paths when copying from subfolder to root model directory
+        if (answers.orm === "TypeORM") {
+          // Change '../../constructs' to '../constructs' since we're moving from typeorm/ to model/
+          content = content.replace(/import { enums } from '\.\.\/\.\.\/constructs';/g, "import { enums } from '../constructs';");
+        }
+        
+        fs.writeFileSync(targetFile, content);
+      }
+    }
+    console.log(`✅ Copied ${answers.orm} models to ./src/model/`);
+  }
+  
+  // Clean up ORM-specific folders after copying
+  const ormFolders = ["typeorm", "sequelize", "prisma", "interfaces"];
+  for (const folder of ormFolders) {
+    const folderPath = path.join(sourceModelsDir, folder);
+    if (fs.existsSync(folderPath)) {
+      fs.removeSync(folderPath);
+    }
+  }
+  
+  console.log(`🧹 Cleaned up unused ORM folders`);
+  
+  // Generate initial migration if ORM supports it
+  if (answers.orm !== "None") {
+    await generateInitialMigration(targetDir, answers);
+  }
+
+  // Create Sequelize configuration files if Sequelize is selected
+  if (answers.orm === "Sequelize") {
+    await createSequelizeConfigFiles(targetDir, answers);
+  }
+}
+
+async function createSequelizeConfigFiles(targetDir, answers) {
+  console.log('🔄 Creating Sequelize configuration files...');
+  
+  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  const configDir = isBTL ? path.join(targetDir, 'api', 'src', 'config') : path.join(targetDir, 'src', 'config');
+
+  // Create .sequelizerc file in project root
+  const sequelizeRcContent = `const path = require('path');
+
+module.exports = {
+  'config': path.resolve('${isBTL ? 'api/src/config' : 'src/config'}', 'sequelize.config.js'),
+  'models-path': path.resolve('${isBTL ? 'api/src/model' : 'src/model'}'),
+  'seeders-path': path.resolve('${isBTL ? 'api/src/seeders' : 'src/seeders'}'),
+  'migrations-path': path.resolve('${isBTL ? 'api/src/migrations' : 'src/migrations'}')
+};
+`;
+
+  await fs.writeFile(path.join(targetDir, '.sequelizerc'), sequelizeRcContent);
+  console.log('✅ Created .sequelizerc configuration file');
+
+  // For BTL template, also create .sequelizerc in api directory with relative paths
+  if (isBTL) {
+    const apiSequelizeRcContent = `const path = require('path');
+
+module.exports = {
+  'config': path.resolve('src/config', 'sequelize.config.js'),
+  'models-path': path.resolve('src/model'),
+  'seeders-path': path.resolve('src/seeders'),
+  'migrations-path': path.resolve('src/migrations')
+};
+`;
+    await fs.writeFile(path.join(targetDir, 'api', '.sequelizerc'), apiSequelizeRcContent);
+    console.log('✅ Created api/.sequelizerc configuration file for BTL template');
+  }
+
+  // Create sequelize.config.js file
+  const sequelizeConfigContent = `require('dotenv').config();
+
+module.exports = {
+  development: {
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    database: process.env.DB_NAME || 'database_development',
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: console.log,
+  },
+  test: {
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    database: process.env.DB_NAME || 'database_test',
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: false,
+  },
+  production: {
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
+  }
+};
+`;
+
+  await fs.ensureDir(configDir);
+  await fs.writeFile(path.join(configDir, 'sequelize.config.js'), sequelizeConfigContent);
+  console.log('✅ Created Sequelize configuration file');
+}
+
+async function generateInitialMigration(targetDir, answers) {
+  console.log(`🔄 Generating initial migration for ${answers.orm}...`);
+  
+  const isNestJS = answers.template === "NestJS Template";
+  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  
+  // Determine migration directory
+  let migrationDir;
+  if (isBTL) {
+    migrationDir = path.join(targetDir, "api/src/migrations");
+  } else if (isNestJS) {
+    migrationDir = path.join(targetDir, "src/migrations");
+  } else {
+    migrationDir = path.join(targetDir, "migrations");
+  }
+  
+  fs.ensureDirSync(migrationDir);
+  
+  const timestamp = Date.now();
+  
+  switch (answers.orm) {
+    case "TypeORM":
+      await generateTypeORMMigration(migrationDir, timestamp, answers);
+      break;
+    case "Sequelize":
+      await generateSequelizeMigration(migrationDir, timestamp, answers);
+      break;
+    case "Prisma":
+      await generatePrismaMigration(targetDir, answers);
+      break;
+  }
+  
+  console.log(`✅ Initial migration generated for ${answers.orm}`);
+}
+
+async function generateTypeORMMigration(migrationDir, timestamp, answers) {
+  const migrationName = `${timestamp}-InitialMigration`;
+  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  
+  let tableCreation, indexCreation, tableDrop;
+  
+  if (isBTL) {
+    // BTL Template with comprehensive models matching actual model definitions
+    tableCreation = `
+        // Countries table
+        await queryRunner.query(\`
+            CREATE TABLE "countries" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "code" character varying(3) NOT NULL,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "UQ_country_code" UNIQUE ("code"),
+                CONSTRAINT "PK_countries" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // States table
+        await queryRunner.query(\`
+            CREATE TABLE "states" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "code" character varying(10) NOT NULL,
+                "countryId" uuid NOT NULL,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_states" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_states_country" FOREIGN KEY ("countryId") REFERENCES "countries"("id")
+            )
+        \`);
+
+        // LGAs table
+        await queryRunner.query(\`
+            CREATE TABLE "lgas" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "code" character varying(10) NOT NULL,
+                "stateId" uuid NOT NULL,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_lgas" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_lgas_state" FOREIGN KEY ("stateId") REFERENCES "states"("id")
+            )
+        \`);
+
+        // Wards table
+        await queryRunner.query(\`
+            CREATE TABLE "wards" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "code" character varying(10) NOT NULL,
+                "lgaId" uuid NOT NULL,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_wards" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_wards_lga" FOREIGN KEY ("lgaId") REFERENCES "lgas"("id")
+            )
+        \`);
+
+        // Zones table
+        await queryRunner.query(\`
+            CREATE TABLE "zones" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "description" text,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_zones" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Groups table
+        await queryRunner.query(\`
+            CREATE TABLE "groups" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "description" text,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_groups" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Roles table
+        await queryRunner.query(\`
+            CREATE TABLE "roles" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(50) NOT NULL,
+                "description" text,
+                "permissions" jsonb,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_roles" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Application Files table
+        await queryRunner.query(\`
+            CREATE TABLE "application_files" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "name" character varying(100) NOT NULL,
+                "key" text NOT NULL,
+                "eTag" text NOT NULL,
+                "mimeType" text NOT NULL,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_application_files" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Users table (comprehensive with all fields matching actual model)
+        await queryRunner.query(\`
+            CREATE TABLE "users" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "firstName" character varying(50),
+                "lastName" character varying(50),
+                "middleName" character varying(50),
+                "gender" integer,
+                "phoneNumber" character varying(15),
+                "emailAddress" character varying(50) NOT NULL,
+                "nin" character varying(11),
+                "profileImageId" uuid,
+                "zoneId" uuid,
+                "stateId" uuid,
+                "lgaId" uuid,
+                "wardId" uuid,
+                "groupId" uuid NOT NULL,
+                "password" character varying,
+                "verified" boolean DEFAULT false,
+                "requirePasswordChange" boolean DEFAULT false,
+                "twoFactorSecret" character varying,
+                "isTwoFactorEnabled" boolean DEFAULT false,
+                "roleId" uuid,
+                "status" integer NOT NULL DEFAULT 1,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "UQ_user_email" UNIQUE ("emailAddress"),
+                CONSTRAINT "UQ_user_phone" UNIQUE ("phoneNumber"),
+                CONSTRAINT "PK_users" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_users_profile_image" FOREIGN KEY ("profileImageId") REFERENCES "application_files"("id"),
+                CONSTRAINT "FK_users_zone" FOREIGN KEY ("zoneId") REFERENCES "zones"("id"),
+                CONSTRAINT "FK_users_state" FOREIGN KEY ("stateId") REFERENCES "states"("id"),
+                CONSTRAINT "FK_users_lga" FOREIGN KEY ("lgaId") REFERENCES "lgas"("id"),
+                CONSTRAINT "FK_users_ward" FOREIGN KEY ("wardId") REFERENCES "wards"("id"),
+                CONSTRAINT "FK_users_group" FOREIGN KEY ("groupId") REFERENCES "groups"("id"),
+                CONSTRAINT "FK_users_role" FOREIGN KEY ("roleId") REFERENCES "roles"("id")
+            )
+        \`);
+
+        // Notifications table
+        await queryRunner.query(\`
+            CREATE TABLE "notifications" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "status" integer NOT NULL,
+                "to" character varying(50) NOT NULL,
+                "from" character varying(100) NOT NULL,
+                "subject" character varying(100) NOT NULL,
+                "text" text NOT NULL,
+                "seen" boolean NOT NULL,
+                "type" integer NOT NULL DEFAULT 0,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_notifications" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Logs table
+        await queryRunner.query(\`
+            CREATE TABLE "logs" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "action" character varying NOT NULL,
+                "entity" character varying NOT NULL,
+                "entityId" uuid,
+                "userId" uuid,
+                "details" jsonb,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_logs" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_logs_user" FOREIGN KEY ("userId") REFERENCES "users"("id")
+            )
+        \`);
+
+        // OTP table (correct structure with otpIssuedAt and isUsed)
+        await queryRunner.query(\`
+            CREATE TABLE "otps" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "email" character varying(50),
+                "otp" character varying(10) NOT NULL,
+                "otpIssuedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "isUsed" boolean NOT NULL DEFAULT false,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "PK_otps" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Token table (correct structure based on actual model)
+        await queryRunner.query(\`
+            CREATE TABLE "tokens" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "tokenName" character varying(200) NOT NULL,
+                "jwt" text,
+                "expires" TIMESTAMP NOT NULL,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "UQ_tokens_token_name" UNIQUE ("tokenName"),
+                CONSTRAINT "PK_tokens" PRIMARY KEY ("id")
+            )
+        \`);
+
+        // Test NIN table (correct structure with ninData JSONB field)
+        await queryRunner.query(\`
+            CREATE TABLE "test_nins" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "nin" character varying(11) NOT NULL,
+                "ninData" jsonb NOT NULL,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "UQ_test_nin" UNIQUE ("nin"),
+                CONSTRAINT "PK_test_nins" PRIMARY KEY ("id")
+            )
+        \`);`;
+
+    indexCreation = `
+        // Create indexes
+        await queryRunner.query(\`CREATE INDEX "IDX_users_email" ON "users" ("emailAddress")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_phone" ON "users" ("phoneNumber")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_state" ON "users" ("stateId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_lga" ON "users" ("lgaId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_ward" ON "users" ("wardId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_group" ON "users" ("groupId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_countries_code" ON "countries" ("code")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_states_country" ON "states" ("countryId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_lgas_state" ON "lgas" ("stateId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_wards_lga" ON "wards" ("lgaId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_otps_email_otp" ON "otps" ("email", "otp")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_test_nins_nin" ON "test_nins" ("nin")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_logs_user" ON "logs" ("userId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_logs_entity" ON "logs" ("entity", "entityId")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_tokens_token_name" ON "tokens" ("tokenName")\`);`;
+
+    tableDrop = `
+        await queryRunner.query(\`DROP TABLE "test_nins"\`);
+        await queryRunner.query(\`DROP TABLE "tokens"\`);
+        await queryRunner.query(\`DROP TABLE "otps"\`);
+        await queryRunner.query(\`DROP TABLE "logs"\`);
+        await queryRunner.query(\`DROP TABLE "notifications"\`);
+        await queryRunner.query(\`DROP TABLE "users"\`);
+        await queryRunner.query(\`DROP TABLE "application_files"\`);
+        await queryRunner.query(\`DROP TABLE "roles"\`);
+        await queryRunner.query(\`DROP TABLE "groups"\`);
+        await queryRunner.query(\`DROP TABLE "zones"\`);
+        await queryRunner.query(\`DROP TABLE "wards"\`);
+        await queryRunner.query(\`DROP TABLE "lgas"\`);
+        await queryRunner.query(\`DROP TABLE "states"\`);
+        await queryRunner.query(\`DROP TABLE "countries"\`);`;
+  } else {
+    // NestJS Template with basic models
+    tableCreation = `
+        // Users table
+        await queryRunner.query(\`
+            CREATE TABLE "users" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "email" character varying NOT NULL,
+                "password" character varying NOT NULL,
+                "isActive" boolean NOT NULL DEFAULT true,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "deletedAt" TIMESTAMP,
+                CONSTRAINT "UQ_user_email" UNIQUE ("email"),
+                CONSTRAINT "PK_users" PRIMARY KEY ("id")
+            )
+        \`);`;
+
+    indexCreation = `
+        await queryRunner.query(\`CREATE INDEX "IDX_users_email" ON "users" ("email")\`);
+        await queryRunner.query(\`CREATE INDEX "IDX_users_isActive" ON "users" ("isActive")\`);`;
+
+    tableDrop = `
+        await queryRunner.query(\`DROP INDEX "IDX_users_isActive"\`);
+        await queryRunner.query(\`DROP INDEX "IDX_users_email"\`);
+        await queryRunner.query(\`DROP TABLE "users"\`);`;
+  }
+
+  const migrationContent = `import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class InitialMigration${timestamp} implements MigrationInterface {
+    name = 'InitialMigration${timestamp}'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {${tableCreation}
+        
+        // Add indexes${indexCreation}
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {${tableDrop}
+    }
+}
+`;
+
+  fs.writeFileSync(path.join(migrationDir, `${migrationName}.ts`), migrationContent);
+}
+
+async function generateSequelizeMigration(migrationDir, timestamp, answers) {
+  const migrationName = `${timestamp}-initial-migration.js`;
+  const isBTL = answers.template === "BTL Template (Enterprise NestJS)";
+  
+  let migrationContent;
+  
+  if (isBTL) {
+    // BTL Template with comprehensive models using auto-increment integers
+    migrationContent = `'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    // Countries table
+    await queryInterface.createTable('countries', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      code: { type: Sequelize.STRING(3), allowNull: false, unique: true },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // States table
+    await queryInterface.createTable('states', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      code: { type: Sequelize.STRING(10), allowNull: false },
+      countryId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'countries', key: 'id' }, field: 'country_id' },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // LGAs table
+    await queryInterface.createTable('lgas', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      code: { type: Sequelize.STRING(10), allowNull: false },
+      stateId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'states', key: 'id' }, field: 'state_id' },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Wards table
+    await queryInterface.createTable('wards', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      code: { type: Sequelize.STRING(10), allowNull: false },
+      lgaId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'lgas', key: 'id' }, field: 'lga_id' },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Zones table
+    await queryInterface.createTable('zones', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      description: { type: Sequelize.TEXT, allowNull: true },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Groups table
+    await queryInterface.createTable('groups', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      description: { type: Sequelize.TEXT, allowNull: true },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Roles table
+    await queryInterface.createTable('roles', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(50), allowNull: false },
+      description: { type: Sequelize.TEXT, allowNull: true },
+      permissions: { type: Sequelize.JSONB, allowNull: true },
+      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true, field: 'is_active' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Application Files table
+    await queryInterface.createTable('application_files', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      name: { type: Sequelize.STRING(100), allowNull: false },
+      key: { type: Sequelize.TEXT, allowNull: false },
+      eTag: { type: Sequelize.TEXT, allowNull: false, field: 'e_tag' },
+      mimeType: { type: Sequelize.TEXT, allowNull: false, field: 'mime_type' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Users table (comprehensive with all fields using integer IDs)
+    await queryInterface.createTable('users', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      firstName: { type: Sequelize.STRING(50), allowNull: true, field: 'first_name' },
+      lastName: { type: Sequelize.STRING(50), allowNull: true, field: 'last_name' },
+      middleName: { type: Sequelize.STRING(50), allowNull: true, field: 'middle_name' },
+      gender: { type: Sequelize.INTEGER, allowNull: true },
+      phoneNumber: { type: Sequelize.STRING(15), allowNull: true, field: 'phone_number' },
+      emailAddress: { type: Sequelize.STRING(50), allowNull: false, field: 'email' },
+      nin: { type: Sequelize.STRING(11), allowNull: true },
+      profileImageId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'application_files', key: 'id' }, field: 'profile_image' },
+      zoneId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'zones', key: 'id' }, field: 'zone' },
+      stateId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'states', key: 'id' }, field: 'state_id' },
+      lgaId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'lgas', key: 'id' }, field: 'lga_id' },
+      wardId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'wards', key: 'id' }, field: 'ward_id' },
+      groupId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'groups', key: 'id' }, field: 'group_id' },
+      password: { type: Sequelize.STRING, allowNull: true },
+      verified: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: false },
+      requirePasswordChange: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: false, field: 'require_password_change' },
+      twoFactorSecret: { type: Sequelize.STRING, allowNull: true, field: 'two_factor_secret' },
+      isTwoFactorEnabled: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: false, field: 'is_two_factor_enabled' },
+      roleId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'roles', key: 'id' }, field: 'role_id' },
+      status: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 1 },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Notifications table
+    await queryInterface.createTable('notifications', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      status: { type: Sequelize.INTEGER, allowNull: false },
+      to: { type: Sequelize.STRING(50), allowNull: false },
+      from: { type: Sequelize.STRING(100), allowNull: false },
+      subject: { type: Sequelize.STRING(100), allowNull: false },
+      text: { type: Sequelize.TEXT, allowNull: false },
+      seen: { type: Sequelize.BOOLEAN, allowNull: false },
+      type: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Logs table
+    await queryInterface.createTable('logs', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      action: { type: Sequelize.STRING, allowNull: false },
+      entity: { type: Sequelize.STRING, allowNull: false },
+      entityId: { type: Sequelize.INTEGER, allowNull: true, field: 'entity_id' },
+      userId: { type: Sequelize.INTEGER, allowNull: true, references: { model: 'users', key: 'id' }, field: 'user_id' },
+      details: { type: Sequelize.JSONB, allowNull: true },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // OTP table
+    await queryInterface.createTable('otps', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      email: { type: Sequelize.STRING(50), allowNull: true },
+      otp: { type: Sequelize.STRING(10), allowNull: false },
+      otpIssuedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW, field: 'otp_issued_at' },
+      isUsed: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false, field: 'is_used' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Token table
+    await queryInterface.createTable('tokens', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      token: { type: Sequelize.TEXT, allowNull: false },
+      type: { type: Sequelize.STRING, allowNull: false },
+      userId: { type: Sequelize.INTEGER, allowNull: false, references: { model: 'users', key: 'id' }, field: 'user_id' },
+      expiresAt: { type: Sequelize.DATE, allowNull: false, field: 'expires_at' },
+      used: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Test NIN table
+    await queryInterface.createTable('test_nins', {
+      id: { allowNull: false, primaryKey: true, type: Sequelize.INTEGER, autoIncrement: true },
+      nin: { type: Sequelize.STRING(11), allowNull: false, unique: true },
+      ninData: { type: Sequelize.JSONB, allowNull: false, field: 'nin_data' },
+      createdAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'created_at' },
+      updatedAt: { allowNull: false, type: Sequelize.DATE, defaultValue: Sequelize.NOW, field: 'updated_at' },
+      deletedAt: { allowNull: true, type: Sequelize.DATE, field: 'deleted_at' }
+    });
+
+    // Add indexes
+    await queryInterface.addIndex('users', ['phone_number'], { unique: true, name: 'users_unique_phone_number' });
+    await queryInterface.addIndex('users', ['email'], { unique: true, name: 'users_unique_email' });
+    await queryInterface.addIndex('users', ['state_id']);
+    await queryInterface.addIndex('users', ['lga_id']);
+    await queryInterface.addIndex('users', ['ward_id']);
+    await queryInterface.addIndex('users', ['group_id']);
+    await queryInterface.addIndex('countries', ['code'], { unique: true });
+    await queryInterface.addIndex('states', ['country_id']);
+    await queryInterface.addIndex('lgas', ['state_id']);
+    await queryInterface.addIndex('wards', ['lga_id']);
+    await queryInterface.addIndex('otps', ['email', 'otp'], { unique: true, name: 'otp_un' });
+    await queryInterface.addIndex('test_nins', ['nin'], { unique: true, name: 'test_nins_nin_unique' });
+    await queryInterface.addIndex('logs', ['user_id']);
+    await queryInterface.addIndex('logs', ['entity', 'entity_id']);
+    await queryInterface.addIndex('tokens', ['user_id']);
+  },
+
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('test_nins');
+    await queryInterface.dropTable('tokens');
+    await queryInterface.dropTable('otps');
+    await queryInterface.dropTable('logs');
+    await queryInterface.dropTable('notifications');
+    await queryInterface.dropTable('users');
+    await queryInterface.dropTable('application_files');
+    await queryInterface.dropTable('roles');
+    await queryInterface.dropTable('groups');
+    await queryInterface.dropTable('zones');
+    await queryInterface.dropTable('wards');
+    await queryInterface.dropTable('lgas');
+    await queryInterface.dropTable('states');
+    await queryInterface.dropTable('countries');
+  }
+};
+`;
+  } else {
+    // NestJS Template with basic models using auto-increment integers
+    migrationContent = `'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    // Users table
+    await queryInterface.createTable('users', {
+      id: {
+        allowNull: false,
+        primaryKey: true,
+        type: Sequelize.INTEGER,
+        autoIncrement: true
+      },
+      email: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true
+      },
+      password: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
+      isActive: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.NOW
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.NOW
+      }
+    });
+
+    // Add indexes
+    await queryInterface.addIndex('users', ['email']);
+    await queryInterface.addIndex('users', ['isActive']);
+  },
+
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('users');
+  }
+};
+`;
+  }
+
+  fs.writeFileSync(path.join(migrationDir, migrationName), migrationContent);
+}
+
+async function generatePrismaMigration(targetDir, answers) {
+  // For Prisma, we create a migration using prisma migrate
+  // The schema is already in place, so we just need to create the migration directory structure
+  const prismaDir = path.join(targetDir, "prisma");
+  const migrationDir = path.join(prismaDir, "migrations");
+  
+  fs.ensureDirSync(migrationDir);
+  
+  // Create a README for Prisma migrations
+  const migrationReadme = `# Database Migrations
+
+This directory contains Prisma migrations.
+
+## Commands:
+- Generate migration: \`npx prisma migrate dev --name init\`
+- Apply migrations: \`npx prisma migrate deploy\`
+- Reset database: \`npx prisma migrate reset\`
+- Generate client: \`npx prisma generate\`
+
+## First Migration:
+After setting up your database connection, run:
+\`\`\`bash
+npx prisma migrate dev --name initial_migration
+\`\`\`
+`;
+
+  fs.writeFileSync(path.join(migrationDir, "README.md"), migrationReadme);
+}
+
 async function customizeBTLTemplate(targetDir, answers) {
   // Customize package.json for BTL template
   await customizeBTLPackageJson(targetDir, answers);
@@ -393,6 +1263,118 @@ async function customizeBTLPackageJson(targetDir, answers) {
 
   packageJson.name = answers.appName;
   packageJson.description = `${answers.appName} - A NestJS application based on BTL template`;
+
+  // Update ORM dependencies based on selection
+  if (answers.orm !== "TypeORM") {
+    // Remove TypeORM dependencies if not selected
+    delete packageJson.dependencies?.typeorm;
+    delete packageJson.dependencies?.["@nestjs/typeorm"];
+    delete packageJson.devDependencies?.typeorm;
+    delete packageJson.devDependencies?.["@nestjs/typeorm"];
+  }
+
+  // Add selected ORM dependencies
+  switch (answers.orm) {
+    case "Sequelize":
+      packageJson.dependencies = packageJson.dependencies || {};
+      packageJson.dependencies["@nestjs/sequelize"] = "^10.0.1";
+      packageJson.dependencies["sequelize"] = "^6.37.3";
+      packageJson.dependencies["sequelize-typescript"] = "^2.1.6";
+      
+      // Add database driver
+      if (answers.db === "PostgreSQL") {
+        packageJson.dependencies.pg = "^8.12.0";
+        packageJson.dependencies["pg-hstore"] = "^2.3.4";
+        packageJson.devDependencies = packageJson.devDependencies || {};
+        packageJson.devDependencies["@types/pg"] = "^8.11.6";
+      } else if (answers.db === "MySQL") {
+        packageJson.dependencies.mysql2 = "^3.11.0";
+      }
+      
+      // Add Sequelize CLI for development
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies["sequelize-cli"] = "^6.6.2";
+      break;
+      
+    case "Prisma":
+      packageJson.dependencies = packageJson.dependencies || {};
+      packageJson.dependencies["@prisma/client"] = "^5.1.1";
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies.prisma = "^5.1.1";
+      break;
+      
+    case "None":
+      // Remove all ORM dependencies
+      delete packageJson.dependencies?.typeorm;
+      delete packageJson.dependencies?.["@nestjs/typeorm"];
+      delete packageJson.dependencies?.["@nestjs/sequelize"];
+      delete packageJson.dependencies?.sequelize;
+      delete packageJson.dependencies?.["sequelize-typescript"];
+      delete packageJson.dependencies?.["@prisma/client"];
+      delete packageJson.devDependencies?.prisma;
+      break;
+  }
+
+  // Clean up all ORM-specific scripts first
+  packageJson.scripts = packageJson.scripts || {};
+  
+  // Remove all TypeORM scripts
+  delete packageJson.scripts["typeorm"];
+  delete packageJson.scripts["migration:create"];
+  delete packageJson.scripts["migration:drop"];
+  delete packageJson.scripts["migration:reset"];
+  delete packageJson.scripts["migration:sync"];
+  delete packageJson.scripts["migration:show"];
+  delete packageJson.scripts["schema:drop"];
+  
+  // Remove all Sequelize scripts
+  delete packageJson.scripts["migration:undo"];
+  delete packageJson.scripts["migration:undo:all"];
+  
+  // Remove all Prisma scripts
+  delete packageJson.scripts["migration:deploy"];
+  delete packageJson.scripts["migration:status"];
+  delete packageJson.scripts["db:generate"];
+  delete packageJson.scripts["db:studio"];
+  delete packageJson.scripts["db:seed"];
+  
+  // Add ORM-specific scripts based on selection
+  switch (answers.orm) {
+    case "TypeORM":
+      packageJson.scripts["typeorm"] = "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js";
+      packageJson.scripts["migration:generate"] = "npm run typeorm migration:generate -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:create"] = "npm run typeorm migration:create";
+      packageJson.scripts["migration:run"] = "npm run typeorm migration:run -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:revert"] = "npm run typeorm migration:revert -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:show"] = "npm run typeorm migration:show -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:drop"] = "npm run typeorm schema:drop -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:reset"] = "npm run typeorm schema:drop -- -d ./src/config/typeorm.config.ts && npm run typeorm schema:sync -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:sync"] = "npm run typeorm schema:sync -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["seed:run"] = "ts-node ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./src/config/typeorm.config.ts";
+      break;
+      
+    case "Sequelize":
+      packageJson.scripts["migration:generate"] = "sequelize-cli migration:generate --name";
+      packageJson.scripts["migration:run"] = "sequelize-cli db:migrate";
+      packageJson.scripts["migration:undo"] = "sequelize-cli db:migrate:undo";
+      packageJson.scripts["migration:undo:all"] = "sequelize-cli db:migrate:undo:all";
+      packageJson.scripts["seed:run"] = "sequelize-cli db:seed:all";
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies["sequelize-cli"] = "^6.6.2";
+      break;
+      
+    case "Prisma":
+      packageJson.scripts["migration:generate"] = "prisma migrate dev";
+      packageJson.scripts["migration:deploy"] = "prisma migrate deploy";
+      packageJson.scripts["migration:reset"] = "prisma migrate reset";
+      packageJson.scripts["migration:status"] = "prisma migrate status";
+      packageJson.scripts["migration:run"] = "prisma migrate deploy";
+      packageJson.scripts["db:generate"] = "prisma generate";
+      packageJson.scripts["db:studio"] = "prisma studio";
+      packageJson.scripts["db:seed"] = "prisma db seed";
+      packageJson.scripts["seed:run"] = "prisma db seed";
+      break;
+  }
 
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 }
@@ -1185,6 +2167,118 @@ async function customizeNestJSPackageJson(targetDir, answers) {
 
   packageJson.name = answers.appName;
   packageJson.description = `${answers.appName} - A NestJS application`;
+
+  // Update ORM dependencies based on selection
+  if (answers.orm !== "TypeORM") {
+    // Remove TypeORM dependencies if not selected
+    delete packageJson.dependencies?.typeorm;
+    delete packageJson.dependencies?.["@nestjs/typeorm"];
+    delete packageJson.devDependencies?.typeorm;
+    delete packageJson.devDependencies?.["@nestjs/typeorm"];
+  }
+
+  // Add selected ORM dependencies
+  switch (answers.orm) {
+    case "Sequelize":
+      packageJson.dependencies = packageJson.dependencies || {};
+      packageJson.dependencies["@nestjs/sequelize"] = "^10.0.1";
+      packageJson.dependencies["sequelize"] = "^6.37.3";
+      packageJson.dependencies["sequelize-typescript"] = "^2.1.6";
+      
+      // Add database driver
+      if (answers.db === "PostgreSQL") {
+        packageJson.dependencies.pg = "^8.12.0";
+        packageJson.dependencies["pg-hstore"] = "^2.3.4";
+        packageJson.devDependencies = packageJson.devDependencies || {};
+        packageJson.devDependencies["@types/pg"] = "^8.11.6";
+      } else if (answers.db === "MySQL") {
+        packageJson.dependencies.mysql2 = "^3.11.0";
+      }
+      
+      // Add Sequelize CLI for development
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies["sequelize-cli"] = "^6.6.2";
+      break;
+      
+    case "Prisma":
+      packageJson.dependencies = packageJson.dependencies || {};
+      packageJson.dependencies["@prisma/client"] = "^5.1.1";
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies.prisma = "^5.1.1";
+      break;
+      
+    case "None":
+      // Remove all ORM dependencies
+      delete packageJson.dependencies?.typeorm;
+      delete packageJson.dependencies?.["@nestjs/typeorm"];
+      delete packageJson.dependencies?.["@nestjs/sequelize"];
+      delete packageJson.dependencies?.sequelize;
+      delete packageJson.dependencies?.["sequelize-typescript"];
+      delete packageJson.dependencies?.["@prisma/client"];
+      delete packageJson.devDependencies?.prisma;
+      break;
+  }
+
+  // Clean up all ORM-specific scripts first
+  packageJson.scripts = packageJson.scripts || {};
+  
+  // Remove all TypeORM scripts
+  delete packageJson.scripts["typeorm"];
+  delete packageJson.scripts["migration:create"];
+  delete packageJson.scripts["migration:drop"];
+  delete packageJson.scripts["migration:reset"];
+  delete packageJson.scripts["migration:sync"];
+  delete packageJson.scripts["migration:show"];
+  delete packageJson.scripts["schema:drop"];
+  
+  // Remove all Sequelize scripts
+  delete packageJson.scripts["migration:undo"];
+  delete packageJson.scripts["migration:undo:all"];
+  
+  // Remove all Prisma scripts
+  delete packageJson.scripts["migration:deploy"];
+  delete packageJson.scripts["migration:status"];
+  delete packageJson.scripts["db:generate"];
+  delete packageJson.scripts["db:studio"];
+  delete packageJson.scripts["db:seed"];
+  
+  // Add ORM-specific scripts based on selection
+  switch (answers.orm) {
+    case "TypeORM":
+      packageJson.scripts["typeorm"] = "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js";
+      packageJson.scripts["migration:generate"] = "npm run typeorm migration:generate -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:create"] = "npm run typeorm migration:create";
+      packageJson.scripts["migration:run"] = "npm run typeorm migration:run -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:revert"] = "npm run typeorm migration:revert -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:show"] = "npm run typeorm migration:show -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:drop"] = "npm run typeorm schema:drop -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:reset"] = "npm run typeorm schema:drop -- -d ./src/config/typeorm.config.ts && npm run typeorm schema:sync -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["migration:sync"] = "npm run typeorm schema:sync -- -d ./src/config/typeorm.config.ts";
+      packageJson.scripts["seed:run"] = "ts-node ./node_modules/typeorm-extension/bin/cli.cjs seed:run -d ./src/config/typeorm.config.ts";
+      break;
+      
+    case "Sequelize":
+      packageJson.scripts["migration:generate"] = "sequelize-cli migration:generate --name";
+      packageJson.scripts["migration:run"] = "sequelize-cli db:migrate";
+      packageJson.scripts["migration:undo"] = "sequelize-cli db:migrate:undo";
+      packageJson.scripts["migration:undo:all"] = "sequelize-cli db:migrate:undo:all";
+      packageJson.scripts["seed:run"] = "sequelize-cli db:seed:all";
+      packageJson.devDependencies = packageJson.devDependencies || {};
+      packageJson.devDependencies["sequelize-cli"] = "^6.6.2";
+      break;
+      
+    case "Prisma":
+      packageJson.scripts["migration:generate"] = "prisma migrate dev";
+      packageJson.scripts["migration:deploy"] = "prisma migrate deploy";
+      packageJson.scripts["migration:reset"] = "prisma migrate reset";
+      packageJson.scripts["migration:status"] = "prisma migrate status";
+      packageJson.scripts["migration:run"] = "prisma migrate deploy";
+      packageJson.scripts["db:generate"] = "prisma generate";
+      packageJson.scripts["db:studio"] = "prisma studio";
+      packageJson.scripts["db:seed"] = "prisma db seed";
+      packageJson.scripts["seed:run"] = "prisma db seed";
+      break;
+  }
 
   // Add PM2 scripts if enabled
   if (answers.enablePM2tools) {

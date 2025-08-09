@@ -24,8 +24,7 @@ import {
   RequestResponseDto,
   ResultResponseDto,
 } from '../../dto/response/base-response-dto';
-import { User } from '../../model/users.model';
-import { Log } from '../../model/logs.model';
+import { User, Log } from '../../model';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserResponseDto } from '../../dto/response/user-response.dto';

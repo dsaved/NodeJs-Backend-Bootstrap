@@ -22,7 +22,7 @@ export const acceptedMimeTypes = [
   'image/svg+xml',
   'image/bmp',
   'image/tiff',
-  
+
   // Applications
   'application/pdf',
   'application/json',
@@ -34,5 +34,4 @@ export const acceptedMimeTypes = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  
 ];

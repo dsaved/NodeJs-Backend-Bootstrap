@@ -6,7 +6,7 @@ import { enums, envs } from '../constructs';
 import { Attachment } from '../constructs/interfaces';
 import { convert } from 'html-to-text';
 import { QueryRunner } from 'typeorm';
-import { Notification } from 'src/model/notifications.model';
+import { Notification } from '../model';
 
 @Injectable()
 class MailHelper {

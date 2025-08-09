@@ -1,13 +1,9 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { readFileSync } from 'fs';
 
 @Injectable()
 export class IndexService {
-
-  constructor() {
-  }
+  constructor() {}
 
   protected quotes: {
     quote: string;

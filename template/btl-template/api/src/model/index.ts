@@ -1,14 +1,8 @@
-export * from './application-files.model';
-export * from './notifications.model';
-export * from './logs.model';
-export * from './otp.model';
-export * from './users.model';
-export * from './lga.model';
-export * from './country.model';
-export * from './roles.model';
-export * from './states.model';
-export * from './zones.model';
-export * from './testnin.model';
-export * from './wards.model';
-export * from './groups.model';
-export * from  './token.model';
+// Main models index file
+// This exports the appropriate model implementation based on the ORM being used
+
+// For TypeORM (default for this template)
+export * from './typeorm';
+
+// Alternatively, you can export specific models:
+// export { User } from './typeorm/users.model';
