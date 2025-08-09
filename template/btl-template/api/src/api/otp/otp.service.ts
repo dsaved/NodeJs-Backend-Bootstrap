@@ -8,7 +8,7 @@ import { DataSource, QueryRunner } from 'typeorm';
 import { OTPRequestDto } from '../../dto/request/otp-request.dto';
 import { numberCode } from '../../helpers/utils';
 import mailHelper from '../../helpers/mail.helper';
-import { Otp } from 'src/model/otp.model';
+import { Otp } from '../../model';
 
 @Injectable()
 export class OTPService {

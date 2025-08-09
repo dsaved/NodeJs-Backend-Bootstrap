@@ -16,8 +16,8 @@ import {
   FileUploadUrlResponseDto,
 } from '../../dto/response/file-upload-response';
 import { getPagination } from '../../helpers/utils';
-import { ApplicationFile } from '../../model/application-files.model';
 import {
+  ApplicationFile,
   Country,
   Group,
   Lga,
@@ -577,7 +577,7 @@ export class IndexService {
           new Set(user?.role?.permission?.accesses.flatMap((p) => p.actions)),
         );
 
-        return uniqueActions;
+        return uniqueActions as string[];
       }
       return Object.values(ActionList);
     } catch (error: any) {
