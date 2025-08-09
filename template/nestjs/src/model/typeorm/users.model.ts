@@ -1,9 +1,4 @@
-import {
-  Entity,
-  Column,
-  Unique,
-  Index,
-} from 'typeorm';
+import { Entity, Column, Unique, Index } from 'typeorm';
 import { BaseModel } from './base.model';
 import { enums } from '../../constructs';
 

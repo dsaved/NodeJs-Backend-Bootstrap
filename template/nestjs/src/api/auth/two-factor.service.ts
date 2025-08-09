@@ -4,7 +4,10 @@ import * as QRCode from 'qrcode';
 
 @Injectable()
 export class TwoFactorService {
-  generateSecret(app: string, email: string): { otpauthUrl: string; base32: string } {
+  generateSecret(
+    app: string,
+    email: string,
+  ): { otpauthUrl: string; base32: string } {
     const secret = speakeasy.generateSecret({
       name: `${app} (${email})`,
     });

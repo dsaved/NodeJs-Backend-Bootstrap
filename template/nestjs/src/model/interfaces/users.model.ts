@@ -54,7 +54,9 @@ export const validateUserGender = (gender: any): gender is enums.GenderEnum => {
   return Object.values(enums.GenderEnum).includes(gender);
 };
 
-export const validateUserStatus = (status: any): status is enums.AccountStatusEnum => {
+export const validateUserStatus = (
+  status: any,
+): status is enums.AccountStatusEnum => {
   return Object.values(enums.AccountStatusEnum).includes(status);
 };
 

@@ -33,9 +33,9 @@ export class User extends Model<User> {
   public middleName: string;
 
   @AllowNull
-  @Column({ 
+  @Column({
     type: DataType.ENUM(...Object.values(enums.GenderEnum)),
-    validate: { isIn: [Object.values(enums.GenderEnum)] }
+    validate: { isIn: [Object.values(enums.GenderEnum)] },
   })
   public gender: enums.GenderEnum;
 
@@ -73,9 +73,9 @@ export class User extends Model<User> {
   public isTwoFactorEnabled: boolean;
 
   @Default(enums.AccountStatusEnum.ACTIVE)
-  @Column({ 
+  @Column({
     type: DataType.ENUM(...Object.values(enums.AccountStatusEnum)),
-    validate: { isIn: [Object.values(enums.AccountStatusEnum)] }
+    validate: { isIn: [Object.values(enums.AccountStatusEnum)] },
   })
   public status: enums.AccountStatusEnum;
 

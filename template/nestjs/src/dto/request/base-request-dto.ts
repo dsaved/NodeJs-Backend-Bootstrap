@@ -1,7 +1,6 @@
-import { IsOptional, ValidateIf } from "class-validator";
+import { IsOptional, ValidateIf } from 'class-validator';
 
 export class BaseRequestDto {
-    
   @IsOptional()
   @ValidateIf((object, value) => value !== null)
   search: string;
@@ -13,5 +12,4 @@ export class BaseRequestDto {
   @IsOptional()
   @ValidateIf((object, value) => value !== null)
   page: number;
-
 }
