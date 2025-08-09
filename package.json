@@ -11,10 +11,28 @@
     "scaffold",
     "bootstrap",
     "nodejs",
-    "project-generator"
+    "project-generator",
+    "nestjs",
+    "express",
+    "fastify",
+    "koa",
+    "typeorm",
+    "sequelize",
+    "prisma",
+    "boilerplate",
+    "template",
+    "backend"
   ],
-  "author": "",
+  "author": "dsaved",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsaved/NodeJs-Backend-Bootstrap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dsaved/NodeJs-Backend-Bootstrap/issues"
+  },
+  "homepage": "https://github.com/dsaved/NodeJs-Backend-Bootstrap#readme",
   "dependencies": {
     "dotenv": "^17.2.1",
     "fs-extra": "^10.0.0",

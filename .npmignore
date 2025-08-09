@@ -1,0 +1,33 @@
+# Development files
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Git files
+.git/
+.gitignore
+
+# Node modules (not needed in published package)
+node_modules/
+
+# GitHub Actions and CI/CD files
+.github/
+
+# Test files (optional - remove if you want to include tests)
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Documentation that's not needed in the package
+docs/
+*.md
+!README.md
+
+# Development scripts
+setup.sh
+
+# Other unnecessary files
+.env*
+.npmrc
