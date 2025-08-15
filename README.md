@@ -38,26 +38,308 @@ The CLI will guide you through an interactive setup to configure your project wi
 - **Database & ORM** (PostgreSQL, MySQL, MongoDB, etc. with TypeORM, Sequelize, or Prisma)
 - **Authentication options** (JWT, X-Signature)
 - **Development tools** (TypeScript/JavaScript, testing, Docker, PM2)
+- **GitHub Actions** (Code quality checks, naming conventions, spell checking, security)
 
-### Example
+### Comprehensive Usage Examples
+
+#### Example 1: Basic Express.js API with Full GitHub Checks
 
 ```bash
 $ init-project
-? What is your application name? my-awesome-api
-? Select a template: Basic Template
-? Select a framework: Express.js
-? Select a database: PostgreSQL
-? Select an ORM: TypeORM
-? Select a language: TypeScript
-? Do you want JWT authentication? Yes
-? Do you want request validation? Yes (Joi)
-? Do you want PM2 process management? No
+? Enter the application name: ecommerce-api
+? Select the project template: Basic Template
+? Select the framework: Express.js
+? Select the ORM: TypeORM
+? Select the database type: PostgreSQL
+? Select the language: TypeScript
+? Do you want authentication (JWT)? Yes
+? Do you want logging (Winston)? Yes
+? Do you want request validation? Yes
+? Select validation library: Joi
+? Do you want testing setup (Jest)? Yes
 ? Do you want Docker configuration? Yes
+? Do you want GitHub Actions for code quality checks? Yes
+? Select GitHub check types: 
+  ✅ Code Quality (ESLint, Prettier)
+  ✅ Naming Conventions
+  ✅ Spell Checking
+  ✅ Security Scanning
+  ✅ Test Coverage
 
-✅ Project created successfully!
-📁 Navigate to: cd my-awesome-api
-🚀 Start development: npm run dev
+📦 Scaffolding project: ecommerce-api
+🔄 Copying template files...
+🔧 Creating GitHub workflows...
+✅ GitHub workflows created
+📥 Installing dependencies...
+
+✅ Project initialized successfully!
+
+📋 Next steps:
+   cd ecommerce-api
+   npm run dev
+
+🔍 GitHub Checks Configuration:
+   ✅ GitHub Actions workflows created
+   ✅ Code Quality checks (ESLint, Prettier)
+   ✅ Naming Convention validation
+   ✅ Spell checking
+   ✅ Security scanning
+   ✅ Test coverage reporting
+
+📝 GitHub Setup:
+   • Push your code to GitHub repository
+   • Enable GitHub Actions in repository settings
+   • Add SNYK_TOKEN secret for security scanning
+   • Configure Codecov for coverage reports
+   • Review .github/CODEOWNERS for team assignments
 ```
+
+#### Example 2: NestJS Microservice with JWT Authentication
+
+```bash
+$ init-project
+? Enter the application name: user-service
+? Select the project template: NestJS Template
+? Select the ORM: TypeORM
+? Select the database type: PostgreSQL
+? Do you want JWT authentication? Yes
+? Do you want X-Signature authentication? No
+? Do you want PM2 process management tools? Yes
+? Do you want comprehensive unit testing setup? Yes
+? Do you want GitHub Actions for code quality checks? Yes
+? Select GitHub check types: 
+  ✅ Code Quality (ESLint, Prettier)
+  ✅ Naming Conventions
+  ✅ Test Coverage
+
+📦 Scaffolding project: user-service
+🔄 Copying template files...
+🔄 Setting up TypeORM models...
+✅ Copied TypeORM models to ./src/model/
+🔧 Creating GitHub workflows...
+✅ GitHub workflows created
+📥 Installing dependencies...
+
+✅ Project initialized successfully!
+
+📋 Next steps:
+   cd user-service
+   npm run start:dev
+
+🔧 Configuration:
+   ✅ JWT Authentication enabled
+   ❌ X-Signature Authentication disabled
+   ✅ PM2 Process Management enabled
+   ✅ Comprehensive Unit Testing enabled
+
+📝 Don't forget to:
+   • Update .env file with your database credentials
+   • Set JWT_SECRET in .env for JWT auth
+   • Configure PM2 settings in ecosystem.config.cjs
+
+🛠️  Available commands:
+   • npm run start:dev - Start development server
+   • npm run build - Build for production
+   • npm run migration:run - Run database migrations
+   • npm run test - Run unit tests
+   • npm run test:e2e - Run end-to-end tests
+   • npm run test:cov - Run tests with coverage
+   • npm run pm2:start - Start with PM2
+   • npm run pm2:stop - Stop PM2 processes
+
+🔍 GitHub Checks Configuration:
+   ✅ GitHub Actions workflows created
+   ✅ Code Quality checks (ESLint, Prettier)
+   ✅ Naming Convention validation
+   ✅ Test coverage reporting
+```
+
+#### Example 3: Enterprise API with Full Security Stack
+
+```bash
+$ init-project
+? Enter the application name: enterprise-platform
+? Select the project template: Enterprise API (NestJS)
+? Select the ORM: TypeORM
+? Select the database type: PostgreSQL
+? Do you want JWT authentication? Yes
+? Do you want X-Signature authentication? Yes
+? Do you want PM2 process management tools? No
+? Do you want comprehensive unit testing setup? Yes
+? Do you want Docker configuration? Yes
+? Do you want GitHub Actions for code quality checks? Yes
+? Select GitHub check types: 
+  ✅ Code Quality (ESLint, Prettier)
+  ✅ Naming Conventions
+  ✅ Spell Checking
+  ✅ Security Scanning
+  ✅ Test Coverage
+
+📦 Scaffolding project: enterprise-platform
+🔄 Copying template files...
+🔄 Setting up TypeORM models...
+✅ Copied TypeORM models to api/src/model/
+🧹 Cleaned up unused ORM folders
+🔄 Generating initial migration for TypeORM...
+✅ Initial migration generated for TypeORM
+🔧 Creating GitHub workflows...
+✅ GitHub workflows created
+📥 Installing dependencies...
+
+✅ Project initialized successfully!
+
+📋 Next steps:
+   cd enterprise-platform
+   make dev-start
+
+� Configuration:
+   ✅ JWT Authentication enabled
+   ✅ X-Signature Authentication enabled
+   ✅ Comprehensive Unit Testing enabled
+
+📝 Don't forget to:
+   • Update api/.env file with your database credentials
+   • Run migrations: make db-migrate-up
+   • Run seeders: make db-seeder-run
+   • Set PRE_SHARED_API_KEY in api/.env for X-Signature auth
+   • Set JWT_SECRET in api/.env for JWT auth
+
+🛠️  Available Makefile commands:
+   • make install - Install dependencies for all services
+   • make dev-start - Start development server
+   • make db-migrate-up - Run database migrations
+   • make db-seeder-run - Run database seeders
+   • make email-test - Test email service
+   • make test - Run comprehensive unit tests
+
+🔍 GitHub Checks Configuration:
+   ✅ GitHub Actions workflows created
+   ✅ Code Quality checks (ESLint, Prettier)
+   ✅ Naming Convention validation
+   ✅ Spell checking
+   ✅ Security scanning
+   ✅ Test coverage reporting
+
+📝 GitHub Setup:
+   • Push your code to GitHub repository
+   • Enable GitHub Actions in repository settings
+   • Add SNYK_TOKEN secret for security scanning
+   • Configure Codecov for coverage reports
+   • Review .github/CODEOWNERS for team assignments
+```
+
+### Generated GitHub Workflows
+
+When you enable GitHub Actions, the following workflows are automatically created:
+
+#### CI Workflow (`.github/workflows/ci.yml`)
+```yaml
+name: CI
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]  # Basic Template
+        # OR node-version: [18.x, 20.x]   # NestJS/Enterprise Templates
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run ESLint
+      run: npm run lint:check
+    
+    - name: Run Prettier Check
+      run: npm run format:check
+    
+    - name: Run Tests with Coverage
+      run: npm run test:coverage  # Basic Template
+      # OR: npm run test:cov      # NestJS/Enterprise Templates
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+```
+
+#### Naming Conventions Workflow
+- Validates kebab-case file naming
+- Checks directory naming conventions
+- Prevents console.log statements
+- Detects hardcoded secrets
+- Validates API endpoint naming
+
+#### Spell Check Workflow
+- Checks spelling in code, comments, and documentation
+- Configurable word dictionary
+- Ignores technical terms and project-specific words
+
+#### Security Workflow (if enabled)
+- Snyk vulnerability scanning
+- Dependency security checks
+- SARIF upload to GitHub Security tab
+
+### GitHub Repository Setup
+
+After creating your project:
+
+1. **Initialize Git and push to GitHub**:
+   ```bash
+   cd your-project-name
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/yourusername/your-project-name.git
+   git push -u origin main
+   ```
+
+2. **Configure repository settings**:
+   - Enable GitHub Actions in repository settings
+   - Add required secrets in Settings > Secrets and variables > Actions:
+     - `SNYK_TOKEN` (for security scanning)
+   - Configure branch protection rules for `main` branch
+   - Require status checks to pass before merging
+
+3. **Set up Codecov** (for coverage reporting):
+   - Sign up at [codecov.io](https://codecov.io)
+   - Connect your GitHub repository
+   - Coverage reports will be automatically uploaded
+
+### GitHub Checks in Action
+
+When you create a pull request, you'll see status checks like:
+
+```
+✅ CI / test (16.x) 
+✅ CI / test (18.x)
+✅ CI / test (20.x)
+✅ Naming Conventions / naming-conventions
+✅ Spell Check / spelling
+✅ Security / security (if enabled)
+```
+
+These checks ensure:
+- Code builds successfully across Node.js versions
+- All tests pass with adequate coverage
+- Code follows naming conventions
+- No spelling errors in code/docs
+- No security vulnerabilities
+- Code is properly formatted
 
 ## ✨ Key Features
 
@@ -97,6 +379,19 @@ $ init-project
 - **PM2 Process Management** OR **Docker** configuration *(mutually exclusive)*
 - **ESLint & Prettier** setup
 
+### 🤖 **GitHub Actions & Code Quality**
+
+- **Automated CI/CD** workflows for all templates
+- **Code Quality Checks** with ESLint and Prettier
+- **Naming Convention Validation** (kebab-case files, PascalCase classes, camelCase variables)
+- **Spell Checking** in code, comments, and documentation
+- **Security Scanning** with Snyk vulnerability detection
+- **Test Coverage Reporting** with Codecov integration
+- **Multi-Node.js Version Testing** (16.x, 18.x, 20.x for Basic; 18.x, 20.x for NestJS/Enterprise)
+- **Template-Specific Workflows** optimized for each project type
+- **Branch Protection** with required status checks
+- **Pull Request Templates** with quality checklists
+
 ## �️ Development Setup (For Contributors)
 
 If you want to contribute to this project or run it locally:
@@ -127,6 +422,13 @@ The CLI will guide you through project configuration:
 8. **Process Management** - PM2 tools *(NestJS & Enterprise API Templates)*
 9. **Testing Setup** - Comprehensive unit testing *(NestJS & Enterprise API Templates)*
 10. **Deployment** - Docker configuration (when PM2 is not selected)
+11. **GitHub Actions** - Code quality checks and CI/CD workflows
+12. **Check Types** - Choose specific GitHub checks to enable:
+    - **Code Quality** (ESLint, Prettier)
+    - **Naming Conventions** (File/folder naming validation)
+    - **Spell Checking** (Code and documentation spell check)
+    - **Security Scanning** (Snyk vulnerability detection)
+    - **Test Coverage** (Codecov integration)
 
 ### After Generation
 
@@ -225,6 +527,128 @@ my-app/
 - `make test` - Run comprehensive unit tests (if enabled)
 - `make pm2-start` - Start with PM2 (if enabled)
 - `make pm2-stop` - Stop PM2 processes (if enabled)
+
+## 🔍 GitHub Actions & Code Quality Checks
+
+The Bootstrap CLI now includes comprehensive GitHub Actions workflows for automated code quality assurance. These workflows are template-specific and can be customized during project creation.
+
+### Available Check Types
+
+#### 🧹 Code Quality Checks
+- **ESLint** - JavaScript/TypeScript linting with naming convention rules
+- **Prettier** - Code formatting consistency checks
+- **Build Validation** - Ensures code compiles successfully across Node.js versions
+
+#### 📝 Naming Convention Validation
+- **File Naming** - Enforces kebab-case for files (e.g., `user-service.ts`)
+- **Directory Naming** - Enforces kebab-case for directories
+- **Code Standards** - Prevents `console.log` statements and hardcoded secrets
+- **API Endpoints** - Validates RESTful naming conventions
+
+#### 🔤 Spell Checking
+- **Code Spelling** - Checks variable names, comments, and strings
+- **Documentation** - Validates README, JSDoc comments, and markdown files
+- **Custom Dictionary** - Includes technical terms and project-specific words
+- **Configurable** - Add project-specific terms to `.cspell.json`
+
+#### 🔒 Security Scanning
+- **Vulnerability Detection** - Snyk integration for dependency scanning
+- **Secret Detection** - Prevents hardcoded API keys and passwords
+- **SARIF Upload** - Security findings appear in GitHub Security tab
+- **Severity Thresholds** - Configurable security severity levels
+
+#### 📊 Test Coverage
+- **Coverage Reporting** - Codecov integration with visual reports
+- **Threshold Enforcement** - Requires minimum coverage percentages
+- **Trend Tracking** - Monitor coverage changes over time
+- **Pull Request Comments** - Coverage diff in PR comments
+
+### Template-Specific Workflows
+
+#### Basic Template Workflows
+```yaml
+# Tests across Node.js 16.x, 18.x, 20.x
+# ESLint with naming conventions
+# Prettier formatting checks
+# Jest with coverage reporting
+# Security scanning with Snyk
+```
+
+#### NestJS Template Workflows
+```yaml
+# Tests across Node.js 18.x, 20.x
+# Database integration testing (PostgreSQL service)
+# NestJS-specific linting rules
+# E2E and unit test coverage
+# Advanced naming convention validation
+```
+
+#### Enterprise API Workflows
+```yaml
+# Multi-service testing (API + Email Service)
+# Microservice-specific checks
+# Makefile command validation
+# Enhanced security scanning
+# Service dependency validation
+```
+
+### Generated GitHub Files
+
+When you enable GitHub Actions, the following files are created:
+
+```
+.github/
+├── workflows/
+│   ├── ci.yml                    # Main CI/CD pipeline
+│   ├── naming-conventions.yml    # Naming validation
+│   └── spell-check.yml          # Spell checking
+├── CODEOWNERS                   # Code ownership assignments
+└── pull_request_template.md     # PR template with checklist
+```
+
+### Repository Setup Checklist
+
+After creating your project and pushing to GitHub:
+
+1. **Enable GitHub Actions**
+   - Go to repository Settings > Actions > General
+   - Allow GitHub Actions to run
+
+2. **Add Required Secrets**
+   - `SNYK_TOKEN` - For security scanning (get from snyk.io)
+   - Configure Codecov token (optional, works without)
+
+3. **Branch Protection**
+   - Enable branch protection for `main` branch
+   - Require status checks before merging
+   - Require pull request reviews
+
+4. **Team Configuration**
+   - Update `.github/CODEOWNERS` with your team handles
+   - Assign ownership for different parts of the codebase
+
+### Status Check Examples
+
+Pull requests will show status checks like:
+
+```bash
+✅ CI / test (16.x)                    # Node.js 16.x tests pass
+✅ CI / test (18.x)                    # Node.js 18.x tests pass  
+✅ CI / test (20.x)                    # Node.js 20.x tests pass
+✅ Naming Conventions                  # File naming is correct
+✅ Spell Check                         # No spelling errors
+✅ Security                            # No vulnerabilities found
+```
+
+### Customization Options
+
+You can customize the workflows by:
+
+- **Editing workflow files** in `.github/workflows/`
+- **Updating ESLint rules** in `.eslintrc.js`
+- **Adding words** to `.cspell.json` for spell checking
+- **Configuring team ownership** in `CODEOWNERS`
+- **Adjusting coverage thresholds** in `jest.config.js`
 
 ## ⚙️ Configuration
 
@@ -373,6 +797,23 @@ The ORM implementation includes comprehensive validation and testing through the
 - ✅ Comprehensive unit testing generation
 
 ## 🆕 Recent Updates & Improvements
+
+### v2.1.0 - GitHub Actions Integration & Code Quality Assurance
+
+**🤖 GitHub Actions & CI/CD:**
+- **Automated Workflows** - Template-specific GitHub Actions for CI/CD
+- **Code Quality Checks** - ESLint, Prettier, and naming convention validation
+- **Security Scanning** - Snyk integration for vulnerability detection
+- **Spell Checking** - CSpell integration for code and documentation
+- **Test Coverage** - Codecov integration with coverage thresholds
+- **Multi-Node Version Testing** - Testing across Node.js 16.x, 18.x, and 20.x
+- **Branch Protection** - Automated status checks for pull requests
+
+**📋 Enhanced Developer Experience:**
+- **Interactive GitHub Setup** - Choose which checks to enable during project creation
+- **Template-Optimized Workflows** - Different CI configurations for Basic, NestJS, and Enterprise templates
+- **Code Ownership** - Automatic CODEOWNERS file generation
+- **PR Templates** - Standardized pull request descriptions with quality checklists
 
 ### v2.0.0 - Template Restructuring & Enhanced Database Support
 

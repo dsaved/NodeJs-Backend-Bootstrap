@@ -160,6 +160,25 @@ async function main() {
       default: false,
       when: (answers) => !answers.enablePM2tools, // Only show Docker if PM2 is not selected
     },
+    {
+      type: "confirm",
+      name: "enableGitHubChecks",
+      message: "Do you want GitHub Actions for code quality checks?",
+      default: true,
+    },
+    {
+      type: "checkbox",
+      name: "githubCheckTypes",
+      message: "Select GitHub check types:",
+      choices: [
+        { name: "Code Quality (ESLint, Prettier)", value: "codeQuality", checked: true },
+        { name: "Naming Conventions", value: "namingConventions", checked: true },
+        { name: "Spell Checking", value: "spellCheck", checked: true },
+        { name: "Security Scanning", value: "security", checked: true },
+        { name: "Test Coverage", value: "coverage", checked: true },
+      ],
+      when: (answers) => answers.enableGitHubChecks,
+    },
   ]);
 
   const targetDir = path.join(process.cwd(), answers.appName);
@@ -197,6 +216,13 @@ async function main() {
     await customizeNestJSTemplate(targetDir, answers);
   } else {
     await customizeBasicTemplate(targetDir, answers);
+  }
+
+  // Create GitHub workflows if enabled
+  if (answers.enableGitHubChecks) {
+    console.log("🔧 Creating GitHub workflows...");
+    await createGitHubWorkflows(targetDir, answers);
+    console.log("✅ GitHub workflows created");
   }
 
   // Install dependencies
@@ -325,6 +351,43 @@ async function main() {
 
   if (answers.enableDocker) {
     console.log(`   docker-compose up (for database)`);
+  }
+
+  if (answers.enableGitHubChecks) {
+    console.log(`\n🔍 GitHub Checks Configuration:`);
+    console.log(`   ✅ GitHub Actions workflows created`);
+    
+    if (answers.githubCheckTypes) {
+      if (answers.githubCheckTypes.includes('codeQuality')) {
+        console.log(`   ✅ Code Quality checks (ESLint, Prettier)`);
+      }
+      if (answers.githubCheckTypes.includes('namingConventions')) {
+        console.log(`   ✅ Naming Convention validation`);
+      }
+      if (answers.githubCheckTypes.includes('spellCheck')) {
+        console.log(`   ✅ Spell checking`);
+      }
+      if (answers.githubCheckTypes.includes('security')) {
+        console.log(`   ✅ Security scanning`);
+      }
+      if (answers.githubCheckTypes.includes('coverage')) {
+        console.log(`   ✅ Test coverage reporting`);
+      }
+    }
+    
+    console.log(`\n📝 GitHub Setup:`);
+    console.log(`   • Push your code to GitHub repository`);
+    console.log(`   • Enable GitHub Actions in repository settings`);
+    
+    if (answers.githubCheckTypes?.includes('security')) {
+      console.log(`   • Add SNYK_TOKEN secret for security scanning`);
+    }
+    
+    if (answers.githubCheckTypes?.includes('coverage')) {
+      console.log(`   • Configure Codecov for coverage reports`);
+    }
+    
+    console.log(`   • Review .github/CODEOWNERS for team assignments`);
   }
 
   console.log(`\n🎉 Happy coding!`);
@@ -3567,6 +3630,768 @@ async function installDependencies(targetDir, answers) {
       console.log(`npm install --save-dev ${devDependencies.join(" ")}`);
     }
   }
+}
+
+// GitHub Workflows Creation Functions
+async function createGitHubWorkflows(targetDir, answers) {
+  const githubDir = path.join(targetDir, ".github");
+  const workflowsDir = path.join(githubDir, "workflows");
+  
+  fs.ensureDirSync(workflowsDir);
+  
+  // Create common GitHub files
+  await createCommonGitHubFiles(githubDir, answers);
+  
+  // Generate workflows based on template
+  if (answers.template === "Basic Template") {
+    await createBasicTemplateWorkflows(workflowsDir, targetDir, answers);
+  } else if (answers.template === "NestJS Template") {
+    await createNestJSTemplateWorkflows(workflowsDir, targetDir, answers);
+  } else if (answers.template === "Enterprise API (NestJS)") {
+    await createEnterpriseTemplateWorkflows(workflowsDir, targetDir, answers);
+  }
+}
+
+async function createCommonGitHubFiles(githubDir, answers) {
+  // Create CODEOWNERS file
+  const codeowners = `# Global owners
+* @${answers.appName}-team
+
+# Frontend specific
+/src/frontend/ @frontend-team
+
+# Backend specific  
+/src/api/ @backend-team
+/src/model/ @backend-team
+
+# Configuration files
+/.github/ @devops-team
+/docker* @devops-team
+/Makefile @devops-team
+`;
+
+  fs.writeFileSync(path.join(githubDir, "CODEOWNERS"), codeowners);
+
+  // Create Pull Request Template
+  const prTemplate = `## Description
+Brief description of the changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+- [ ] Refactoring
+- [ ] Performance improvement
+
+## Testing
+- [ ] Tests pass locally
+- [ ] New tests added for new functionality
+- [ ] Manual testing completed
+
+## Checklist
+- [ ] Code follows naming conventions
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] No console.log statements
+- [ ] Environment variables documented
+`;
+
+  fs.writeFileSync(path.join(githubDir, "pull_request_template.md"), prTemplate);
+}
+
+async function createBasicTemplateWorkflows(workflowsDir, targetDir, answers) {
+  const checkTypes = answers.githubCheckTypes || [];
+  
+  // Main CI workflow
+  if (checkTypes.includes('codeQuality') || checkTypes.includes('coverage')) {
+    const ciWorkflow = `name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js \${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: \${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    ${checkTypes.includes('codeQuality') ? `
+    - name: Run ESLint
+      run: npm run lint
+    
+    - name: Run Prettier Check
+      run: npm run format:check
+    ` : ''}
+    
+    ${checkTypes.includes('coverage') ? `
+    - name: Run Tests with Coverage
+      run: npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+    ` : ''}
+
+  ${checkTypes.includes('security') ? `
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+    
+    - name: Upload result to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: snyk.sarif
+  ` : ''}
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Naming conventions workflow
+  if (checkTypes.includes('namingConventions')) {
+    const namingWorkflow = `name: Naming Conventions
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  naming-conventions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check file naming conventions
+      run: |
+        # Check for kebab-case file names
+        echo "Checking file naming conventions..."
+        violation_found=false
+        
+        find . -name "*.js" -o -name "*.ts" | grep -v node_modules | grep -v ".git" | while read file; do
+          filename=\$(basename "\$file" | cut -f 1 -d '.')
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$filename" =~ ^(index|main|app|server)\$ ]]; then
+            echo "❌ File naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        if [ "\$violation_found" = true ]; then
+          exit 1
+        fi
+    
+    - name: Check directory naming conventions
+      run: |
+        echo "Checking directory naming conventions..."
+        violation_found=false
+        
+        find . -type d -name "*" | grep -v node_modules | grep -v ".git" | grep -v ".github" | while read dir; do
+          dirname=\$(basename "\$dir")
+          if [[ ! "\$dirname" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$dirname" =~ ^(\\.|src|test|tests|coverage|dist|build|node_modules)\$ ]]; then
+            echo "❌ Directory naming violation: \$dir should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        if [ "\$violation_found" = true ]; then
+          exit 1
+        fi
+    
+    - name: Check for console.log statements
+      run: |
+        if grep -r "console\\.log" . --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=.git; then
+          echo "❌ Found console.log statements. Use proper logging instead."
+          exit 1
+        fi
+    
+    - name: Check for hardcoded values
+      run: |
+        if grep -r -E "(password|secret|key|token).*=.*['\"].*['\"]" . --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=.git; then
+          echo "❌ Found potential hardcoded secrets"
+          exit 1
+        fi
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "naming-conventions.yml"), namingWorkflow);
+  }
+
+  // Spell check workflow
+  if (checkTypes.includes('spellCheck')) {
+    const spellCheckWorkflow = `name: Spell Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  spelling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check Spelling
+      uses: streetsidesoftware/cspell-action@v2
+      with:
+        files: "**/*.{js,ts,md,json}"
+        config: ".cspell.json"
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "spell-check.yml"), spellCheckWorkflow);
+    
+    // Create cspell configuration
+    const cspellConfig = {
+      version: "0.2",
+      language: "en",
+      words: [
+        "nestjs", "typeorm", "sequelize", "prisma", "fastify", "koa", "winston", "joi", "zod",
+        "middleware", "dto", "enum", "struct", "async", "await", "typeof", "instanceof",
+        "readonly", "namespace", "enum", "interface", "jwt", "auth", "uuid", "bcrypt",
+        answers.appName.toLowerCase()
+      ],
+      ignorePaths: [
+        "node_modules/**",
+        "coverage/**",
+        "dist/**",
+        "build/**",
+        "*.log",
+        "package-lock.json"
+      ]
+    };
+    
+    fs.writeFileSync(path.join(targetDir, ".cspell.json"), JSON.stringify(cspellConfig, null, 2));
+  }
+
+  // Create ESLint and Prettier configs for Basic Template
+  await createBasicTemplateLintConfigs(targetDir, answers);
+}
+
+async function createNestJSTemplateWorkflows(workflowsDir, targetDir, answers) {
+  const checkTypes = answers.githubCheckTypes || [];
+  
+  // NestJS specific CI workflow
+  if (checkTypes.includes('codeQuality') || checkTypes.includes('coverage')) {
+    const ciWorkflow = `name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js \${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: \${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    ${checkTypes.includes('codeQuality') ? `
+    - name: Run ESLint
+      run: npm run lint
+    
+    - name: Run Prettier Check
+      run: npm run format:check
+    ` : ''}
+    
+    - name: Build application
+      run: npm run build
+    
+    ${checkTypes.includes('coverage') ? `
+    - name: Run Tests with Coverage
+      run: npm run test:cov
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        fail_ci_if_error: true
+    ` : ''}
+
+  ${checkTypes.includes('security') ? `
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+    
+    - name: Upload result to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: snyk.sarif
+  ` : ''}
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Add naming conventions and spell check similar to basic template
+  if (checkTypes.includes('namingConventions')) {
+    await createNestJSNamingConventions(workflowsDir);
+  }
+
+  if (checkTypes.includes('spellCheck')) {
+    await createSpellCheckWorkflow(workflowsDir, targetDir, answers);
+  }
+}
+
+async function createEnterpriseTemplateWorkflows(workflowsDir, targetDir, answers) {
+  const checkTypes = answers.githubCheckTypes || [];
+  
+  // Enterprise API specific CI workflow
+  if (checkTypes.includes('codeQuality') || checkTypes.includes('coverage')) {
+    const ciWorkflow = `name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  api-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js \${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: \${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: 'api/package-lock.json'
+    
+    - name: Install API dependencies
+      working-directory: ./api
+      run: npm ci
+    
+    ${checkTypes.includes('codeQuality') ? `
+    - name: Run ESLint for API
+      working-directory: ./api
+      run: npm run lint
+    
+    - name: Run Prettier Check for API
+      working-directory: ./api
+      run: npm run format:check
+    ` : ''}
+    
+    - name: Build API application
+      working-directory: ./api
+      run: npm run build
+    
+    ${checkTypes.includes('coverage') ? `
+    - name: Run API Tests with Coverage
+      working-directory: ./api
+      run: npm run test:cov
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        JWT_SECRET: test-secret
+        PRE_SHARED_API_KEY: test-api-key
+    
+    - name: Upload API coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./api/coverage/lcov.info
+        flags: api
+        name: api-coverage
+        fail_ci_if_error: true
+    ` : ''}
+
+  email-service-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js \${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: \${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: 'email-service/package-lock.json'
+    
+    - name: Install Email Service dependencies
+      working-directory: ./email-service
+      run: npm ci
+    
+    ${checkTypes.includes('codeQuality') ? `
+    - name: Run ESLint for Email Service
+      working-directory: ./email-service
+      run: npm run lint || echo "No lint script found"
+    ` : ''}
+    
+    ${checkTypes.includes('coverage') ? `
+    - name: Run Email Service Tests
+      working-directory: ./email-service
+      run: npm test || echo "No test script found"
+    ` : ''}
+
+  ${checkTypes.includes('security') ? `
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Snyk to check for vulnerabilities in API
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --file=api/package.json --severity-threshold=high
+    
+    - name: Run Snyk to check for vulnerabilities in Email Service
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --file=email-service/package.json --severity-threshold=high
+  ` : ''}
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Add naming conventions and spell check for enterprise
+  if (checkTypes.includes('namingConventions')) {
+    await createEnterpriseNamingConventions(workflowsDir);
+  }
+
+  if (checkTypes.includes('spellCheck')) {
+    await createSpellCheckWorkflow(workflowsDir, targetDir, answers);
+  }
+}
+
+async function createBasicTemplateLintConfigs(targetDir, answers) {
+  // ESLint configuration
+  const eslintConfig = {
+    env: {
+      node: true,
+      es2021: true,
+      jest: answers.enableTesting
+    },
+    extends: [
+      "eslint:recommended",
+      ...(answers.language === "TypeScript" ? ["@typescript-eslint/recommended"] : [])
+    ],
+    parser: answers.language === "TypeScript" ? "@typescript-eslint/parser" : "espree",
+    parserOptions: {
+      ecmaVersion: 12,
+      sourceType: "module"
+    },
+    plugins: answers.language === "TypeScript" ? ["@typescript-eslint"] : [],
+    rules: {
+      "no-console": "warn",
+      "no-unused-vars": "error",
+      "no-undef": "error",
+      "prefer-const": "error",
+      "no-var": "error"
+    }
+  };
+
+  fs.writeFileSync(path.join(targetDir, ".eslintrc.json"), JSON.stringify(eslintConfig, null, 2));
+
+  // Prettier configuration
+  const prettierConfig = {
+    semi: true,
+    trailingComma: "es5",
+    singleQuote: true,
+    printWidth: 80,
+    tabWidth: 2,
+    useTabs: false
+  };
+
+  fs.writeFileSync(path.join(targetDir, ".prettierrc"), JSON.stringify(prettierConfig, null, 2));
+
+  // Add lint scripts to package.json
+  const packageJsonPath = path.join(targetDir, "package.json");
+  if (fs.existsSync(packageJsonPath)) {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+    packageJson.scripts = packageJson.scripts || {};
+    packageJson.scripts.lint = "eslint . --ext .js,.ts";
+    packageJson.scripts["lint:fix"] = "eslint . --ext .js,.ts --fix";
+    packageJson.scripts["format:check"] = "prettier --check .";
+    packageJson.scripts["format:fix"] = "prettier --write .";
+    
+    if (answers.enableTesting) {
+      packageJson.scripts["test:coverage"] = "jest --coverage";
+    }
+    
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  }
+}
+
+async function createNestJSNamingConventions(workflowsDir) {
+  const namingWorkflow = `name: NestJS Naming Conventions
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  naming-conventions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check NestJS naming conventions
+      run: |
+        echo "Checking NestJS naming conventions..."
+        violation_found=false
+        
+        # Check controller files
+        find ./src -name "*.controller.ts" | while read file; do
+          filename=\$(basename "\$file" .controller.ts)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]]; then
+            echo "❌ Controller naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        # Check service files
+        find ./src -name "*.service.ts" | while read file; do
+          filename=\$(basename "\$file" .service.ts)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]]; then
+            echo "❌ Service naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        # Check module files
+        find ./src -name "*.module.ts" | while read file; do
+          filename=\$(basename "\$file" .module.ts)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]]; then
+            echo "❌ Module naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        if [ "\$violation_found" = true ]; then
+          exit 1
+        fi
+    
+    - name: Check API endpoint naming
+      run: |
+        if grep -r "@Get\\|@Post\\|@Put\\|@Delete\\|@Patch" ./src --include="*.ts" | grep -E "'/[A-Z]|'[^/].*[A-Z]"; then
+          echo "❌ API endpoint naming violation found"
+          echo "   API endpoints should use lowercase and kebab-case"
+          exit 1
+        fi
+`;
+
+  fs.writeFileSync(path.join(workflowsDir, "naming-conventions.yml"), namingWorkflow);
+}
+
+async function createEnterpriseNamingConventions(workflowsDir) {
+  const namingWorkflow = `name: Enterprise API Naming Conventions
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  naming-conventions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check Enterprise API naming conventions
+      run: |
+        echo "Checking Enterprise API naming conventions..."
+        violation_found=false
+        
+        # Check API controller files
+        find ./api/src -name "*.controller.ts" | while read file; do
+          filename=\$(basename "\$file" .controller.ts)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]]; then
+            echo "❌ Controller naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        # Check API service files
+        find ./api/src -name "*.service.ts" | while read file; do
+          filename=\$(basename "\$file" .service.ts)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]]; then
+            echo "❌ Service naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        # Check email service files
+        find ./email-service -name "*.js" | while read file; do
+          filename=\$(basename "\$file" .js)
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$filename" =~ ^(index|test)\$ ]]; then
+            echo "❌ Email service file naming violation: \$file should use kebab-case"
+            violation_found=true
+          fi
+        done
+        
+        if [ "\$violation_found" = true ]; then
+          exit 1
+        fi
+    
+    - name: Check for microservice consistency
+      run: |
+        # Check that all services follow the same structure
+        if [ ! -d "./api" ] || [ ! -d "./email-service" ]; then
+          echo "❌ Missing required service directories"
+          exit 1
+        fi
+        
+        # Check Makefile targets naming
+        if [ -f "./Makefile" ]; then
+          if grep -E "^[A-Z].*:" Makefile; then
+            echo "❌ Makefile targets should use lowercase and kebab-case"
+            exit 1
+          fi
+        fi
+`;
+
+  fs.writeFileSync(path.join(workflowsDir, "naming-conventions.yml"), namingWorkflow);
+}
+
+async function createSpellCheckWorkflow(workflowsDir, targetDir, answers) {
+  const spellCheckWorkflow = `name: Spell Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  spelling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check Spelling
+      uses: streetsidesoftware/cspell-action@v2
+      with:
+        files: "**/*.{js,ts,md,json}"
+        config: ".cspell.json"
+`;
+
+  fs.writeFileSync(path.join(workflowsDir, "spell-check.yml"), spellCheckWorkflow);
+  
+  // Create cspell configuration
+  const cspellConfig = {
+    version: "0.2",
+    language: "en",
+    words: [
+      "nestjs", "typeorm", "sequelize", "prisma", "fastify", "koa", "winston", "joi", "zod",
+      "middleware", "dto", "enum", "struct", "async", "await", "typeof", "instanceof",
+      "readonly", "namespace", "enum", "interface", "jwt", "auth", "uuid", "bcrypt",
+      "mikro", "mikroorm", "serverless", "makefile", "dockerfile", "postgres", "mysql",
+      "mssql", "mongodb", "sqlite", "redis", "elasticsearch", "swagger", "openapi",
+      answers.appName.toLowerCase()
+    ],
+    ignorePaths: [
+      "node_modules/**",
+      "coverage/**",
+      "dist/**",
+      "build/**",
+      "*.log",
+      "package-lock.json",
+      ".git/**"
+    ]
+  };
+  
+  fs.writeFileSync(path.join(targetDir, ".cspell.json"), JSON.stringify(cspellConfig, null, 2));
 }
 
 main().catch((err) => {
