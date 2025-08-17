@@ -380,7 +380,7 @@ async function main() {
     console.log(`   • Enable GitHub Actions in repository settings`);
     
     if (answers.githubCheckTypes?.includes('security')) {
-      console.log(`   • Add SNYK_TOKEN secret for security scanning`);
+      console.log(`   • Security scanning will use OSV Scanner and Trivy (no secrets required)`);
     }
     
     if (answers.githubCheckTypes?.includes('coverage')) {
@@ -3730,81 +3730,76 @@ jobs:
         node-version: \${{ matrix.node-version }}
         cache: 'npm'
     
-    - name: Install dependencies
-      run: npm ci
-    
-    ${checkTypes.includes('codeQuality') ? `
-    - name: Run ESLint
-      run: npm run lint
-    
-    - name: Run Prettier Check
-      run: npm run format:check
-    ` : ''}
-    
-    ${checkTypes.includes('coverage') ? `
-    - name: Run Tests with Coverage
-      run: npm run test:coverage
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        fail_ci_if_error: true
-    ` : ''}
+    // Main CI workflow
+    if (checkTypes.includes('codeQuality') || checkTypes.includes('coverage') || checkTypes.includes('security')) {
+      const ciWorkflow = `name: CI
 
-  ${checkTypes.includes('security') ? `
-  security:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Snyk to check for vulnerabilities
-      uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high
-    
-    - name: Upload result to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: snyk.sarif
-  ` : ''}
-`;
-
-    fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
-  }
-
-  // Naming conventions workflow
-  if (checkTypes.includes('namingConventions')) {
-    const namingWorkflow = `name: Naming Conventions
-
-on:
-  pull_request:
-    branches: [ main, develop ]
-
-jobs:
-  naming-conventions:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Check file naming conventions
-      run: |
-        # Check for kebab-case file names
-        echo "Checking file naming conventions..."
-        violation_found=false
-        
-        find . -name "*.js" -o -name "*.ts" | grep -v node_modules | grep -v ".git" | while read file; do
-          filename=\$(basename "\$file" | cut -f 1 -d '.')
-          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$filename" =~ ^(index|main|app|server)\$ ]]; then
             echo "❌ File naming violation: \$file should use kebab-case"
+    push:
+      branches: [ main, develop ]
+    pull_request:
+      branches: [ main, develop ]
+
             violation_found=true
+    test:
+      runs-on: ubuntu-latest
+    
+      strategy:
+        matrix:
+          node-version: [16.x, 18.x, 20.x]
+    
+      steps:
+      - uses: actions/checkout@v4
+    
+      - name: Use Node.js \${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: \${{ matrix.node-version }}
+          cache: 'npm'
+    
+      - name: Install dependencies
+        run: npm ci
+    
+      ${checkTypes.includes('codeQuality') ? `
+      - name: Run ESLint
+        run: npm run lint
+    
+      - name: Run Prettier Check
+        run: npm run format:check
+      ` : ''}
+    
+      ${checkTypes.includes('coverage') ? `
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
+      ` : ''}
+
+    ${checkTypes.includes('security') ? `
+    security:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Run OSV Scanner
+          uses: google/osv-scanner-action@v1
+          with:
+            path: .
+
+        - name: Install Trivy
+          run: |
+            sudo apt-get update && sudo apt-get install -y wget
+            wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.2_Linux-64bit.tar.gz | tar zxvf -
+            sudo mv trivy /usr/local/bin/
+
+        - name: Run Trivy FS scan
+          run: trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+
+        - name: Run Trivy config scan
+          run: trivy config --exit-code 1 --severity HIGH,CRITICAL .
+    ` : ''}
+  `;
+
+      fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+    }
           fi
         done
         

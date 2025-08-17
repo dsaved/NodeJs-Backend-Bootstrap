@@ -89,8 +89,8 @@ $ init-project
 📝 GitHub Setup:
    • Push your code to GitHub repository
    • Enable GitHub Actions in repository settings
-   • Add SNYK_TOKEN secret for security scanning
-   • Configure Codecov for coverage reports
+   • Add OSV Scanner and Trivy configuration for security scanning
+   • Test coverage reporting is built-in (no Codecov required)
    • Review .github/CODEOWNERS for team assignments
 ```
 
@@ -223,8 +223,8 @@ $ init-project
 📝 GitHub Setup:
    • Push your code to GitHub repository
    • Enable GitHub Actions in repository settings
-   • Add SNYK_TOKEN secret for security scanning
-   • Configure Codecov for coverage reports
+   • Add OSV Scanner and Trivy configuration for security scanning
+   • Test coverage reporting is built-in (no Codecov required)
    • Review .github/CODEOWNERS for team assignments
 ```
 
@@ -270,11 +270,7 @@ jobs:
       run: npm run test:coverage  # Basic Template
       # OR: npm run test:cov      # NestJS/Enterprise Templates
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        fail_ci_if_error: true
+   # Coverage is reported in the workflow output (no Codecov required)
 ```
 
 #### Naming Conventions Workflow
@@ -290,7 +286,7 @@ jobs:
 - Ignores technical terms and project-specific words
 
 #### Security Workflow (if enabled)
-- Snyk vulnerability scanning
+   - OSV Scanner and Trivy vulnerability scanning
 - Dependency security checks
 - SARIF upload to GitHub Security tab
 
@@ -311,14 +307,9 @@ After creating your project:
 2. **Configure repository settings**:
    - Enable GitHub Actions in repository settings
    - Add required secrets in Settings > Secrets and variables > Actions:
-     - `SNYK_TOKEN` (for security scanning)
-   - Configure branch protection rules for `main` branch
-   - Require status checks to pass before merging
-
-3. **Set up Codecov** (for coverage reporting):
-   - Sign up at [codecov.io](https://codecov.io)
-   - Connect your GitHub repository
-   - Coverage reports will be automatically uploaded
+   - See [Trivy GitHub Action docs](https://github.com/aquasecurity/trivy-action) for configuration
+    - Configure branch protection rules for `main` branch
+    - Require status checks to pass before merging
 
 ### GitHub Checks in Action
 
@@ -330,7 +321,8 @@ When you create a pull request, you'll see status checks like:
 ✅ CI / test (20.x)
 ✅ Naming Conventions / naming-conventions
 ✅ Spell Check / spelling
-✅ Security / security (if enabled)
+✅ Security / osv-scanner (if enabled)
+✅ Security / trivy (if enabled)
 ```
 
 These checks ensure:
@@ -385,8 +377,8 @@ These checks ensure:
 - **Code Quality Checks** with ESLint and Prettier
 - **Naming Convention Validation** (kebab-case files, PascalCase classes, camelCase variables)
 - **Spell Checking** in code, comments, and documentation
-- **Security Scanning** with Snyk vulnerability detection
-- **Test Coverage Reporting** with Codecov integration
+- **Security Scanning** with OSV Scanner and Trivy
+- **Test Coverage Reporting** (built-in, no Codecov required)
 - **Multi-Node.js Version Testing** (16.x, 18.x, 20.x for Basic; 18.x, 20.x for NestJS/Enterprise)
 - **Template-Specific Workflows** optimized for each project type
 - **Branch Protection** with required status checks
@@ -427,8 +419,8 @@ The CLI will guide you through project configuration:
     - **Code Quality** (ESLint, Prettier)
     - **Naming Conventions** (File/folder naming validation)
     - **Spell Checking** (Code and documentation spell check)
-    - **Security Scanning** (Snyk vulnerability detection)
-    - **Test Coverage** (Codecov integration)
+   - **Security Scanning** (OSV Scanner and Trivy)
+   - **Test Coverage** (built-in, no Codecov required)
 
 ### After Generation
 
@@ -551,14 +543,13 @@ The Bootstrap CLI now includes comprehensive GitHub Actions workflows for automa
 - **Custom Dictionary** - Includes technical terms and project-specific words
 - **Configurable** - Add project-specific terms to `.cspell.json`
 
-#### 🔒 Security Scanning
-- **Vulnerability Detection** - Snyk integration for dependency scanning
+- **Vulnerability Detection** - OSV Scanner and Trivy for dependency and container scanning
 - **Secret Detection** - Prevents hardcoded API keys and passwords
 - **SARIF Upload** - Security findings appear in GitHub Security tab
 - **Severity Thresholds** - Configurable security severity levels
 
 #### 📊 Test Coverage
-- **Coverage Reporting** - Codecov integration with visual reports
+- **Coverage Reporting** - Built-in coverage reports (no Codecov required)
 - **Threshold Enforcement** - Requires minimum coverage percentages
 - **Trend Tracking** - Monitor coverage changes over time
 - **Pull Request Comments** - Coverage diff in PR comments
@@ -571,7 +562,7 @@ The Bootstrap CLI now includes comprehensive GitHub Actions workflows for automa
 # ESLint with naming conventions
 # Prettier formatting checks
 # Jest with coverage reporting
-# Security scanning with Snyk
+# Security scanning with OSV Scanner and Trivy
 ```
 
 #### NestJS Template Workflows
@@ -615,8 +606,7 @@ After creating your project and pushing to GitHub:
    - Allow GitHub Actions to run
 
 2. **Add Required Secrets**
-   - `SNYK_TOKEN` - For security scanning (get from snyk.io)
-   - Configure Codecov token (optional, works without)
+   - See Trivy and OSV Scanner documentation for any required configuration
 
 3. **Branch Protection**
    - Enable branch protection for `main` branch
@@ -803,7 +793,7 @@ The ORM implementation includes comprehensive validation and testing through the
 **🤖 GitHub Actions & CI/CD:**
 - **Automated Workflows** - Template-specific GitHub Actions for CI/CD
 - **Code Quality Checks** - ESLint, Prettier, and naming convention validation
-- **Security Scanning** - Snyk integration for vulnerability detection
+- **Security Scanning** - OSV Scanner and Trivy for vulnerability detection
 - **Spell Checking** - CSpell integration for code and documentation
 - **Test Coverage** - Codecov integration with coverage thresholds
 - **Multi-Node Version Testing** - Testing across Node.js 16.x, 18.x, and 20.x
