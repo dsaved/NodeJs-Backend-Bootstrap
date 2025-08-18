@@ -1,10 +1,36 @@
 # Node.js Backend Bootstrap CLI
 
-🚀 A powerful CLI tool to quickly scaffold Node.js backend pro## 🛠️ Development Setup (For Contributors)
+🚀 A powerful CLI tool to quickly scaffold Node.js backend projects with your preferred technology stack.
 
-**Prerequisites:** Node.js 22.0.0 or higher
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat&logo=github-actions&logoColor=white)
+![ESLint](https://img.shields.io/badge/ESLint-4B3263?style=flat&logo=eslint&logoColor=white)
+![Prettier](https://img.shields.io/badge/prettier-1A2C34?style=flat&logo=prettier&logoColor=F7BA3E)
+![Jest](https://img.shields.io/badge/Jest-323330?style=flat&logo=jest&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 
-If you want to contribute to this project or run it locally:ts with your preferred technology stack.
+## 🌟 Features
+
+### 🔍 **GitHub Actions Integration**
+- **Automated Code Quality Checks**: ESLint, Prettier formatting validation
+- **Security Scanning**: OSV Scanner and Trivy vulnerability detection  
+- **Naming Conventions**: Enforces kebab-case files, PascalCase classes, camelCase variables
+- **Spell Checking**: CSpell validation for code and documentation
+- **Test Coverage**: Jest coverage reporting with configurable thresholds
+- **Email Notifications**: SMTP alerts for security vulnerabilities (optional)
+
+### 🏗️ **Multi-Template Support**
+- **Basic Template**: Express.js, Fastify, Koa.js applications
+- **NestJS Template**: Full-featured NestJS applications with decorators
+- **Enterprise API**: Multi-service architecture (API + Email Service)
+
+### 🗄️ **Database & ORM Support**
+- **Databases**: PostgreSQL, MySQL, MSSQL, MongoDB, SQLite
+- **ORMs**: TypeORM, Sequelize, Prisma with automatic configuration
+
+### 🔐 **Authentication & Security**
+- **JWT Authentication**: Complete auth implementation
+- **X-Signature**: Pre-shared key validation
+- **Security Best Practices**: Hardcoded secret detection, input validation
 
 ## 🚀 Quick Start
 
@@ -42,12 +68,25 @@ The CLI will guide you through an interactive setup to configure your project wi
 
 ### Comprehensive Usage Examples
 
-#### Example 1: Basic Express.js API with Full GitHub Checks
+#### Example 1: NestJS API with Full GitHub Checks
 
 ```bash
 $ init-project
-? Enter the application name: ecommerce-api
-? Select the project template: Basic Template
+? Enter the application name: user-management-api
+? Select the project template: NestJS Template
+? Select the ORM: TypeORM
+? Select the database type: PostgreSQL
+? Do you want JWT authentication? Yes
+? Do you want GitHub Actions for code quality checks? Yes
+? Select GitHub check types: 
+  ✅ Code Quality (ESLint, Prettier)
+  ✅ Naming Conventions
+  ✅ Spell Checking  
+  ✅ Security Scanning
+  ✅ Test Coverage
+? Do you want testing (Jest)? Yes
+? Do you want validation (class-validator)? Yes
+? Do you want Docker setup? Yes
 ? Select the framework: Express.js
 ? Select the ORM: TypeORM
 ? Select the database type: PostgreSQL
@@ -227,6 +266,80 @@ $ init-project
    • Test coverage reporting is built-in (no Codecov required)
    • Review .github/CODEOWNERS for team assignments
 ```
+
+## 🔍 GitHub Actions & Code Quality
+
+When you enable GitHub Actions, the CLI generates a comprehensive CI/CD pipeline with the following workflows:
+
+### 📋 Generated Files
+
+```
+your-project/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                    # Main CI pipeline
+│   │   ├── naming-conventions.yml    # File naming validation
+│   │   ├── spell-check.yml          # Spell checking
+│   │   └── security.yml             # Security scanning
+│   ├── CODEOWNERS                   # Team ownership rules
+│   └── pull_request_template.md     # PR template
+├── .eslintrc.js                     # Enhanced ESLint config
+├── .cspell.json                     # Spell check dictionary
+└── package.json                     # Updated with lint scripts
+```
+
+### 🛡️ Security Configuration
+
+**⚠️ IMPORTANT**: To enable email notifications for security vulnerabilities, add these secrets to your GitHub repository:
+
+```bash
+# Repository Settings → Secrets and variables → Actions
+
+SMTP_SERVER=smtp.gmail.com          # Your SMTP server
+SMTP_USERNAME=your-email@gmail.com  # Your email address  
+SMTP_PASSWORD=your-app-password     # Your email app password
+SMTP_MAIL_TO=team@company.com       # Where to send alerts
+SMTP_MAIL_FROM=alerts@company.com   # From address
+```
+
+**Note**: Email notifications are optional - the security scan will still run without SMTP configuration.
+
+### 🏗️ Template-Specific Workflows
+
+#### Basic Template
+- Standard CI with multiple Node.js versions (18.x, 20.x)
+- ESLint and Prettier validation
+- Basic security scanning with OSV and Trivy
+
+#### NestJS Template  
+- PostgreSQL service for database testing
+- NestJS-specific linting rules and naming conventions
+- Enhanced test coverage with codecov integration
+- Decorator and dependency injection validation
+
+#### Enterprise API Template
+- Multi-service architecture support (API + Email Service)
+- Separate workflows for each service
+- Cross-service dependency validation
+- Service-specific security scanning with detailed reports
+
+### 📊 Naming Conventions Enforced
+
+- **Files**: `kebab-case.ts` ✅ | `camelCase.ts` ❌ | `PascalCase.ts` ❌
+- **Directories**: `user-management/` ✅ | `userManagement/` ❌  
+- **Classes**: `UserService` ✅ | `userService` ❌
+- **Variables**: `userData` ✅ | `user_data` ❌
+- **Constants**: `API_KEY` ✅ | `apiKey` ❌
+- **API Endpoints**: `/api/users` ✅ | `/api/Users` ❌
+
+### 🧪 Coverage Thresholds
+
+- **Lines**: 80% minimum
+- **Functions**: 80% minimum  
+- **Branches**: 80% minimum
+- **Statements**: 80% minimum
+
+For detailed implementation guide, see [GITHUB_CHECKS_IMPLEMENTATION.md](GITHUB_CHECKS_IMPLEMENTATION.md)
 
 ### Generated GitHub Workflows
 

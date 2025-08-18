@@ -3709,9 +3709,9 @@ async function createBasicTemplateWorkflows(workflowsDir, targetDir, answers) {
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   test:
@@ -3719,7 +3719,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [16.x, 18.x, 20.x]
+        node-version: [18.x, 20.x]
     
     steps:
     - uses: actions/checkout@v4
@@ -3730,92 +3730,56 @@ jobs:
         node-version: \${{ matrix.node-version }}
         cache: 'npm'
     
-    // Main CI workflow
-    if (checkTypes.includes('codeQuality') || checkTypes.includes('coverage') || checkTypes.includes('security')) {
-      const ciWorkflow = `name: CI
-
-            echo "❌ File naming violation: \$file should use kebab-case"
-    push:
-      branches: [ main, develop ]
-    pull_request:
-      branches: [ main, develop ]
-
-            violation_found=true
-    test:
-      runs-on: ubuntu-latest
+    - name: Install dependencies
+      run: npm ci
     
-      strategy:
-        matrix:
-          node-version: [16.x, 18.x, 20.x]
+    ${checkTypes.includes('codeQuality') ? `
+    - name: Run ESLint
+      run: npm run lint:check
     
-      steps:
-      - uses: actions/checkout@v4
-    
-      - name: Use Node.js \${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: \${{ matrix.node-version }}
-          cache: 'npm'
-    
-      - name: Install dependencies
-        run: npm ci
-    
-      ${checkTypes.includes('codeQuality') ? `
-      - name: Run ESLint
-        run: npm run lint
-    
-      - name: Run Prettier Check
-        run: npm run format:check
-      ` : ''}
-    
-      ${checkTypes.includes('coverage') ? `
-      - name: Run Tests with Coverage
-        run: npm run test:coverage
-      ` : ''}
-
-    ${checkTypes.includes('security') ? `
-    security:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-
-        - name: Run OSV Scanner
-          uses: google/osv-scanner-action@v1
-          with:
-            path: .
-
-        - name: Install Trivy
-          run: |
-            sudo apt-get update && sudo apt-get install -y wget
-            wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.2_Linux-64bit.tar.gz | tar zxvf -
-            sudo mv trivy /usr/local/bin/
-
-        - name: Run Trivy FS scan
-          run: trivy fs --exit-code 1 --severity HIGH,CRITICAL .
-
-        - name: Run Trivy config scan
-          run: trivy config --exit-code 1 --severity HIGH,CRITICAL .
+    - name: Run Prettier Check
+      run: npm run format:check
     ` : ''}
-  `;
-
-      fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
-    }
-          fi
-        done
-        
-        if [ "\$violation_found" = true ]; then
-          exit 1
-        fi
     
-    - name: Check directory naming conventions
+    - name: Build application
+      run: npm run build
+    
+    ${checkTypes.includes('coverage') ? `
+    - name: Run Tests with Coverage
+      run: npm run test:cov
+    ` : ''}
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Naming conventions workflow
+  if (checkTypes.includes('namingConventions')) {
+    const namingWorkflow = `name: Naming Conventions
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  naming-conventions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check file naming conventions
       run: |
-        echo "Checking directory naming conventions..."
+        echo "Checking for kebab-case file naming..."
         violation_found=false
         
-        find . -type d -name "*" | grep -v node_modules | grep -v ".git" | grep -v ".github" | while read dir; do
-          dirname=\$(basename "\$dir")
-          if [[ ! "\$dirname" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$dirname" =~ ^(\\.|src|test|tests|coverage|dist|build|node_modules)\$ ]]; then
-            echo "❌ Directory naming violation: \$dir should use kebab-case"
+        # Check TypeScript/JavaScript files (excluding spec files)
+        find src -name "*.ts" -o -name "*.js" | grep -v node_modules | grep -v ".spec." | grep -v ".test." | while read file; do
+          filename=\$(basename "\$file" | sed 's/\\.[^.]*\$//')
+          if [[ ! "\$filename" =~ ^[a-z0-9]+(-[a-z0-9]+)*\$ ]] && [[ ! "\$filename" =~ ^(index|main|app)\$ ]]; then
+            echo "❌ File naming violation: \$file should use kebab-case"
             violation_found=true
           fi
         done
@@ -3826,17 +3790,19 @@ jobs:
     
     - name: Check for console.log statements
       run: |
-        if grep -r "console\\.log" . --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=.git; then
-          echo "❌ Found console.log statements. Use proper logging instead."
+        if grep -r "console\\.log" src --include="*.js" --include="*.ts" 2>/dev/null; then
+          echo "❌ Found console.log statements in source code"
           exit 1
         fi
+        echo "✅ No console.log statements found"
     
-    - name: Check for hardcoded values
+    - name: Check for hardcoded secrets
       run: |
-        if grep -r -E "(password|secret|key|token).*=.*['\"].*['\"]" . --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=.git; then
+        if grep -r -E "(password|secret|key|token)\\s*=\\s*['\"][^'\"]{8,}" src --include="*.js" --include="*.ts" 2>/dev/null; then
           echo "❌ Found potential hardcoded secrets"
           exit 1
         fi
+        echo "✅ No hardcoded secrets detected"
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "naming-conventions.yml"), namingWorkflow);
@@ -3847,8 +3813,10 @@ jobs:
     const spellCheckWorkflow = `name: Spell Check
 
 on:
+  push:
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   spelling:
@@ -3857,36 +3825,101 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Check Spelling
-      uses: streetsidesoftware/cspell-action@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        files: "**/*.{js,ts,md,json}"
-        config: ".cspell.json"
+        node-version: "20.x"
+    
+    - name: Install CSpell
+      run: npm install -g cspell
+    
+    - name: Run spell check
+      run: cspell "src/**/*.{ts,js}" "**/*.md" "**/*.json" --config .cspell.json
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "spell-check.yml"), spellCheckWorkflow);
     
     // Create cspell configuration
-    const cspellConfig = {
-      version: "0.2",
-      language: "en",
-      words: [
-        "nestjs", "typeorm", "sequelize", "prisma", "fastify", "koa", "winston", "joi", "zod",
-        "middleware", "dto", "enum", "struct", "async", "await", "typeof", "instanceof",
-        "readonly", "namespace", "enum", "interface", "jwt", "auth", "uuid", "bcrypt",
-        answers.appName.toLowerCase()
-      ],
-      ignorePaths: [
-        "node_modules/**",
-        "coverage/**",
-        "dist/**",
-        "build/**",
-        "*.log",
-        "package-lock.json"
-      ]
-    };
-    
-    fs.writeFileSync(path.join(targetDir, ".cspell.json"), JSON.stringify(cspellConfig, null, 2));
+    await createCSpellConfig(targetDir, answers);
+  }
+
+  // Security workflow
+  if (checkTypes.includes('security')) {
+    const securityWorkflow = `name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  osv-trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OSV Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+      - name: Run OSV Scanner on lockfiles and fail on vulnerabilities
+        continue-on-error: true
+        run: |
+          if [ -f yarn.lock ]; then
+            osv-scanner --lockfile=yarn.lock | tee osv-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found!"
+              exit 1
+            fi
+          elif [ -f package-lock.json ]; then
+            osv-scanner --lockfile=package-lock.json | tee osv-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found!"
+              exit 1
+            fi
+          else
+            echo "No lockfile found. Skipping vulnerability scan."
+          fi
+      - name: Install Trivy
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget
+          wget -qO trivy.deb https://github.com/aquasecurity/trivy/releases/download/v0.65.0/trivy_0.65.0_Linux-64bit.deb
+          sudo dpkg -i trivy.deb
+      - name: Run Trivy FS scan
+        continue-on-error: true
+        run: |
+          trivy fs . --exit-code 1 --severity MEDIUM,HIGH,CRITICAL | tee trivy-report.txt
+          if grep -E '│ (yarn.lock|package-lock.json) │ [^│]+ │[[:space:]]*[1-9][0-9]*[[:space:]]*│' trivy-report.txt; then
+            echo "VULN_FOUND=true" >> \$GITHUB_ENV
+            echo "❌ Vulnerabilities found by Trivy!"
+            exit 1
+          fi
+      - name: Send vulnerability report email
+        if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: \${{ secrets.SMTP_SERVER }}
+          server_port: 465
+          username: \${{ secrets.SMTP_USERNAME }}
+          password: \${{ secrets.SMTP_PASSWORD }}
+          subject: "Vulnerability Scan Failed - \${{ github.repository }}"
+          to: \${{ secrets.SMTP_MAIL_TO }}
+          from: \${{ secrets.SMTP_MAIL_FROM }}
+          body: |
+            The vulnerability scan failed for \${{ github.repository }}.
+            See attached reports for details.
+          attachments: |
+            osv-report.txt
+            trivy-report.txt
+      - name: Fail job if vulnerabilities found
+        if: env.VULN_FOUND == 'true'
+        run: exit 1
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
   }
 
   // Create ESLint and Prettier configs for Basic Template
@@ -3942,7 +3975,7 @@ jobs:
     
     ${checkTypes.includes('codeQuality') ? `
     - name: Run ESLint
-      run: npm run lint
+      run: npm run lint:check
     
     - name: Run Prettier Check
       run: npm run format:check
@@ -3963,30 +3996,83 @@ jobs:
         file: ./coverage/lcov.info
         fail_ci_if_error: true
     ` : ''}
-
-  ${checkTypes.includes('security') ? `
-  security:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Snyk to check for vulnerabilities
-      uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --severity-threshold=high
-    
-    - name: Upload result to GitHub Code Scanning
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: snyk.sarif
-  ` : ''}
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Security workflow for NestJS (separate file like Enterprise)
+  if (checkTypes.includes('security')) {
+    const securityWorkflow = `name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  osv-trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OSV Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+      - name: Run OSV Scanner on lockfiles
+        continue-on-error: true
+        run: |
+          if [ -f yarn.lock ]; then
+            osv-scanner --lockfile=yarn.lock | tee osv-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found!"
+            fi
+          elif [ -f package-lock.json ]; then
+            osv-scanner --lockfile=package-lock.json | tee osv-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found!"
+            fi
+          fi
+      - name: Install Trivy
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget
+          wget -qO trivy.deb https://github.com/aquasecurity/trivy/releases/download/v0.65.0/trivy_0.65.0_Linux-64bit.deb
+          sudo dpkg -i trivy.deb
+      - name: Run Trivy FS scan
+        continue-on-error: true
+        run: |
+          trivy fs . --exit-code 1 --severity MEDIUM,HIGH,CRITICAL | tee trivy-report.txt
+          if grep -E '│ (yarn.lock|package-lock.json) │ [^│]+ │[[:space:]]*[1-9][0-9]*[[:space:]]*│' trivy-report.txt; then
+            echo "VULN_FOUND=true" >> \$GITHUB_ENV
+            echo "❌ Vulnerabilities found by Trivy!"
+          fi
+      - name: Send vulnerability report email
+        if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: \${{ secrets.SMTP_SERVER }}
+          server_port: 465
+          username: \${{ secrets.SMTP_USERNAME }}
+          password: \${{ secrets.SMTP_PASSWORD }}
+          subject: "NestJS Security Scan Failed - \${{ github.repository }}"
+          to: \${{ secrets.SMTP_MAIL_TO }}
+          from: \${{ secrets.SMTP_MAIL_FROM }}
+          body: |
+            The vulnerability scan failed for \${{ github.repository }}.
+            See attached reports for details.
+          attachments: |
+            osv-report.txt
+            trivy-report.txt
+      - name: Fail job if vulnerabilities found
+        if: env.VULN_FOUND == 'true'
+        run: exit 1
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
   }
 
   // Add naming conventions and spell check similar to basic template
@@ -4008,9 +4094,9 @@ async function createEnterpriseTemplateWorkflows(workflowsDir, targetDir, answer
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   api-test:
@@ -4051,7 +4137,7 @@ jobs:
     ${checkTypes.includes('codeQuality') ? `
     - name: Run ESLint for API
       working-directory: ./api
-      run: npm run lint
+      run: npm run lint:check
     
     - name: Run Prettier Check for API
       working-directory: ./api
@@ -4070,14 +4156,6 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
         JWT_SECRET: test-secret
         PRE_SHARED_API_KEY: test-api-key
-    
-    - name: Upload API coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./api/coverage/lcov.info
-        flags: api
-        name: api-coverage
-        fail_ci_if_error: true
     ` : ''}
 
   email-service-test:
@@ -4112,31 +4190,109 @@ jobs:
       working-directory: ./email-service
       run: npm test || echo "No test script found"
     ` : ''}
-
-  ${checkTypes.includes('security') ? `
-  security:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Snyk to check for vulnerabilities in API
-      uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --file=api/package.json --severity-threshold=high
-    
-    - name: Run Snyk to check for vulnerabilities in Email Service
-      uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: \${{ secrets.SNYK_TOKEN }}
-      with:
-        args: --file=email-service/package.json --severity-threshold=high
-  ` : ''}
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "ci.yml"), ciWorkflow);
+  }
+
+  // Security workflow for enterprise (checks both API and email-service)
+  if (checkTypes.includes('security')) {
+    const securityWorkflow = `name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  osv-trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OSV Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+      - name: Run OSV Scanner on API lockfiles
+        continue-on-error: true
+        run: |
+          if [ -f api/yarn.lock ]; then
+            osv-scanner --lockfile=api/yarn.lock | tee osv-api-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-api-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ API Vulnerabilities found!"
+            fi
+          elif [ -f api/package-lock.json ]; then
+            osv-scanner --lockfile=api/package-lock.json | tee osv-api-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-api-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ API Vulnerabilities found!"
+            fi
+          fi
+      - name: Run OSV Scanner on Email Service lockfiles
+        continue-on-error: true
+        run: |
+          if [ -f email-service/yarn.lock ]; then
+            osv-scanner --lockfile=email-service/yarn.lock | tee osv-email-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-email-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Email Service Vulnerabilities found!"
+            fi
+          elif [ -f email-service/package-lock.json ]; then
+            osv-scanner --lockfile=email-service/package-lock.json | tee osv-email-report.txt
+            if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-email-report.txt; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Email Service Vulnerabilities found!"
+            fi
+          fi
+      - name: Install Trivy
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget
+          wget -qO trivy.deb https://github.com/aquasecurity/trivy/releases/download/v0.65.0/trivy_0.65.0_Linux-64bit.deb
+          sudo dpkg -i trivy.deb
+      - name: Run Trivy FS scan on API
+        continue-on-error: true
+        run: |
+          trivy fs ./api --exit-code 1 --severity MEDIUM,HIGH,CRITICAL | tee trivy-api-report.txt
+          if grep -E '│ (api/yarn.lock|api/package-lock.json) │ [^│]+ │[[:space:]]*[1-9][0-9]*[[:space:]]*│' trivy-api-report.txt; then
+            echo "VULN_FOUND=true" >> \$GITHUB_ENV
+            echo "❌ API Vulnerabilities found by Trivy!"
+          fi
+      - name: Run Trivy FS scan on Email Service
+        continue-on-error: true
+        run: |
+          trivy fs ./email-service --exit-code 1 --severity MEDIUM,HIGH,CRITICAL | tee trivy-email-report.txt
+          if grep -E '│ (email-service/yarn.lock|email-service/package-lock.json) │ [^│]+ │[[:space:]]*[1-9][0-9]*[[:space:]]*│' trivy-email-report.txt; then
+            echo "VULN_FOUND=true" >> \$GITHUB_ENV
+            echo "❌ Email Service Vulnerabilities found by Trivy!"
+          fi
+      - name: Send vulnerability report email
+        if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: \${{ secrets.SMTP_SERVER }}
+          server_port: 465
+          username: \${{ secrets.SMTP_USERNAME }}
+          password: \${{ secrets.SMTP_PASSWORD }}
+          subject: "Enterprise API Vulnerability Scan Failed - \${{ github.repository }}"
+          to: \${{ secrets.SMTP_MAIL_TO }}
+          from: \${{ secrets.SMTP_MAIL_FROM }}
+          body: |
+            The vulnerability scan failed for \${{ github.repository }}.
+            See attached reports for details.
+          attachments: |
+            osv-api-report.txt
+            osv-email-report.txt
+            trivy-api-report.txt
+            trivy-email-report.txt
+      - name: Fail job if vulnerabilities found
+        if: env.VULN_FOUND == 'true'
+        run: exit 1
+`;
+
+    fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
   }
 
   // Add naming conventions and spell check for enterprise
@@ -4196,16 +4352,44 @@ async function createBasicTemplateLintConfigs(targetDir, answers) {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
     packageJson.scripts = packageJson.scripts || {};
     packageJson.scripts.lint = "eslint . --ext .js,.ts";
+    packageJson.scripts["lint:check"] = "eslint . --ext .js,.ts";
     packageJson.scripts["lint:fix"] = "eslint . --ext .js,.ts --fix";
     packageJson.scripts["format:check"] = "prettier --check .";
     packageJson.scripts["format:fix"] = "prettier --write .";
     
-    if (answers.enableTesting) {
-      packageJson.scripts["test:coverage"] = "jest --coverage";
+    if (answers.enableTesting || checkTypes.includes('coverage')) {
+      packageJson.scripts["test:cov"] = "jest --coverage";
     }
     
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
   }
+}
+
+async function createCSpellConfig(targetDir, answers) {
+  // Create cspell configuration
+  const cspellConfig = {
+    version: "0.2",
+    language: "en",
+    words: [
+      "nestjs", "typeorm", "sequelize", "prisma", "fastify", "koa", "winston", "joi", "zod",
+      "middleware", "dto", "enum", "struct", "async", "await", "typeof", "instanceof",
+      "readonly", "namespace", "enum", "interface", "jwt", "auth", "uuid", "bcrypt",
+      "mikro", "mikroorm", "serverless", "makefile", "dockerfile", "postgres", "mysql",
+      "mssql", "mongodb", "sqlite", "redis", "elasticsearch", "swagger", "openapi",
+      answers.appName.toLowerCase()
+    ],
+    ignorePaths: [
+      "node_modules/**",
+      "coverage/**",
+      "dist/**",
+      "build/**",
+      "*.log",
+      "package-lock.json",
+      ".git/**"
+    ]
+  };
+  
+  fs.writeFileSync(path.join(targetDir, ".cspell.json"), JSON.stringify(cspellConfig, null, 2));
 }
 
 async function createNestJSNamingConventions(workflowsDir) {
