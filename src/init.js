@@ -3850,20 +3850,30 @@ jobs:
 on:
   push:
     branches: [main, develop]
+    paths:
+      - "**"
   pull_request:
     branches: [main, develop]
+    paths:
+      - "**"
 
 jobs:
-  osv-trivy-scan:
+  sast-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
       - name: Install OSV Scanner
         run: |
           curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
-      - name: Run OSV Scanner on lockfiles and fail on vulnerabilities
+      - name: Run OSV Scanner on lockfiles
         continue-on-error: true
         run: |
           if [ -f yarn.lock ]; then
@@ -3871,18 +3881,17 @@ jobs:
             if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
               echo "VULN_FOUND=true" >> \$GITHUB_ENV
               echo "❌ Vulnerabilities found!"
-              exit 1
             fi
           elif [ -f package-lock.json ]; then
             osv-scanner --lockfile=package-lock.json | tee osv-report.txt
             if grep -E 'Vulnerabilities:[[:space:]]*[1-9][0-9]*' osv-report.txt; then
               echo "VULN_FOUND=true" >> \$GITHUB_ENV
               echo "❌ Vulnerabilities found!"
-              exit 1
             fi
           else
             echo "No lockfile found. Skipping vulnerability scan."
           fi
+
       - name: Install Trivy
         run: |
           sudo apt-get update && sudo apt-get install -y wget
@@ -3895,8 +3904,49 @@ jobs:
           if grep -E '│ (yarn.lock|package-lock.json) │ [^│]+ │[[:space:]]*[1-9][0-9]*[[:space:]]*│' trivy-report.txt; then
             echo "VULN_FOUND=true" >> \$GITHUB_ENV
             echo "❌ Vulnerabilities found by Trivy!"
-            exit 1
           fi
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "basic-app"
+          path: "."
+          format: "JSON"
+          out: "dependency-check-report"
+
+      - name: Check Dependency Check report for vulnerabilities
+        run: |
+          if [ -f dependency-check-report/dependency-check-report.json ]; then
+            VULN_COUNT=\$(jq '.dependencies[].vulnerabilities | select(. != null) | length' dependency-check-report/dependency-check-report.json | awk '{s+=\$1} END {print s}')
+            if [ "\$VULN_COUNT" -gt 0 ]; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found by Dependency Check!"
+            fi
+          fi
+
+      - name: Summarize Dependency Check vulnerabilities
+        run: |
+          SUMMARY_FILE="dependency-check-summary.txt"
+          if [ -f dependency-check-report/dependency-check-report.json ]; then
+            echo -e "Vulnerable Dependency | Vulnerability ID | Severity | Description\\n---------------------|-------------------|----------|------------" > \$SUMMARY_FILE
+            jq -r '
+              .dependencies[] |
+              select(.vulnerabilities != null) |
+              .fileName as \$dep |
+              .vulnerabilities[] |
+              [\$dep, .name, .severity, (.description | gsub("\\n"; " "))] |
+              @tsv
+            ' dependency-check-report/dependency-check-report.json | while IFS=\$'\\t' read -r dep id severity desc; do
+              wrapped_desc=\$(echo "\$desc" | fold -s -w 120)
+              printf "%s | %s | %s | %s\\n\\n" "\$dep" "\$id" "\$severity" "\$wrapped_desc" >> \$SUMMARY_FILE
+            done
+          else
+            echo "No Dependency Check report found." > \$SUMMARY_FILE
+          fi
+
       - name: Send vulnerability report email
         if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
         uses: dawidd6/action-send-mail@v3
@@ -3905,21 +3955,70 @@ jobs:
           server_port: 465
           username: \${{ secrets.SMTP_USERNAME }}
           password: \${{ secrets.SMTP_PASSWORD }}
-          subject: "Vulnerability Scan Failed - \${{ github.repository }}"
+          subject: "Basic Template Security Scan Failed - \${{ github.repository }}"
           to: \${{ secrets.SMTP_MAIL_TO }}
           from: \${{ secrets.SMTP_MAIL_FROM }}
           body: |
-            The vulnerability scan failed for \${{ github.repository }}.
-            See attached reports for details.
+            Security vulnerability scan failed for \${{ github.repository }}.
+
+            Tools that found vulnerabilities:
+            - OSV Scanner: Check osv-report.txt
+            - Trivy: Check trivy-report.txt  
+            - OWASP Dependency Check: Check dependency-check-summary.txt
+
+            Please review and remediate the identified vulnerabilities.
           attachments: |
             osv-report.txt
             trivy-report.txt
+            dependency-check-summary.txt
+
       - name: Fail job if vulnerabilities found
         if: env.VULN_FOUND == 'true'
         run: exit 1
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
+
+    // Create ZAP configuration directory and rules file for Basic Template
+    const zapDir = path.join(targetDir, ".zap");
+    fs.ensureDirSync(zapDir);
+    
+    const zapRules = `# .zap/rules.tsv
+# OWASP ZAP Rules Configuration for Basic Template
+# Format: RULE_ID    ACTION    DESCRIPTION
+
+# Common false positives to ignore
+10011    IGNORE    Cookie Without Secure Flag
+10015    IGNORE    Incomplete or No Cache-control and Pragma HTTP Header Set
+10021    IGNORE    X-Content-Type-Options Header Missing
+10020    IGNORE    X-Frame-Options Header Not Set
+10016    IGNORE    Web Browser XSS Protection Not Enabled
+10017    IGNORE    Cross-Domain JavaScript Source File Inclusion
+10035    IGNORE    Strict-Transport-Security Header Not Set
+10063    IGNORE    Permissions Policy Header Not Set
+
+# Development environment specific ignores
+10098    IGNORE    Cross-Domain Misconfiguration
+10055    IGNORE    CSP Scanner: Wildcard Directive
+10038    IGNORE    Content Security Policy (CSP) Header Not Set
+
+# API-specific rules
+10024    WARN      Information Disclosure - Sensitive Information in URL
+10025    WARN      Information Disclosure - Sensitive Information in HTTP Referrer Header
+10027    WARN      Information Disclosure - Suspicious Comments
+
+# Security rules to enforce (FAIL)
+90020    FAIL      Remote Code Execution - CVE-2012-1823
+90019    FAIL      Code Injection
+40018    FAIL      SQL Injection
+40019    FAIL      SQL Injection - MySQL
+40020    FAIL      SQL Injection - Hypersonic SQL
+40021    FAIL      SQL Injection - Oracle
+40022    FAIL      SQL Injection - PostgreSQL
+90018    FAIL      Remote Code Execution - CVE-2014-6271
+`;
+
+    fs.writeFileSync(path.join(zapDir, "rules.tsv"), zapRules);
   }
 
   // Create ESLint and Prettier configs for Basic Template
@@ -4008,14 +4107,24 @@ jobs:
 on:
   push:
     branches: [main, develop]
+    paths:
+      - "**"
   pull_request:
     branches: [main, develop]
+    paths:
+      - "**"
 
 jobs:
-  osv-trivy-scan:
+  sast-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
       - name: Install OSV Scanner
         run: |
           curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
@@ -4036,7 +4145,10 @@ jobs:
               echo "VULN_FOUND=true" >> \$GITHUB_ENV
               echo "❌ Vulnerabilities found!"
             fi
+          else
+            echo "No lockfile found. Skipping vulnerability scan."
           fi
+
       - name: Install Trivy
         run: |
           sudo apt-get update && sudo apt-get install -y wget
@@ -4050,6 +4162,48 @@ jobs:
             echo "VULN_FOUND=true" >> \$GITHUB_ENV
             echo "❌ Vulnerabilities found by Trivy!"
           fi
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "nestjs-app"
+          path: "."
+          format: "JSON"
+          out: "dependency-check-report"
+
+      - name: Check Dependency Check report for vulnerabilities
+        run: |
+          if [ -f dependency-check-report/dependency-check-report.json ]; then
+            VULN_COUNT=\$(jq '.dependencies[].vulnerabilities | select(. != null) | length' dependency-check-report/dependency-check-report.json | awk '{s+=\$1} END {print s}')
+            if [ "\$VULN_COUNT" -gt 0 ]; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Vulnerabilities found by Dependency Check!"
+            fi
+          fi
+
+      - name: Summarize Dependency Check vulnerabilities
+        run: |
+          SUMMARY_FILE="dependency-check-summary.txt"
+          if [ -f dependency-check-report/dependency-check-report.json ]; then
+            echo -e "Vulnerable Dependency | Vulnerability ID | Severity | Description\\n---------------------|-------------------|----------|------------" > \$SUMMARY_FILE
+            jq -r '
+              .dependencies[] |
+              select(.vulnerabilities != null) |
+              .fileName as \$dep |
+              .vulnerabilities[] |
+              [\$dep, .name, .severity, (.description | gsub("\\n"; " "))] |
+              @tsv
+            ' dependency-check-report/dependency-check-report.json | while IFS=\$'\\t' read -r dep id severity desc; do
+              wrapped_desc=\$(echo "\$desc" | fold -s -w 120)
+              printf "%s | %s | %s | %s\\n\\n" "\$dep" "\$id" "\$severity" "\$wrapped_desc" >> \$SUMMARY_FILE
+            done
+          else
+            echo "No Dependency Check report found." > \$SUMMARY_FILE
+          fi
+
       - name: Send vulnerability report email
         if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
         uses: dawidd6/action-send-mail@v3
@@ -4062,17 +4216,135 @@ jobs:
           to: \${{ secrets.SMTP_MAIL_TO }}
           from: \${{ secrets.SMTP_MAIL_FROM }}
           body: |
-            The vulnerability scan failed for \${{ github.repository }}.
-            See attached reports for details.
+            Security vulnerability scan failed for \${{ github.repository }}.
+
+            Tools that found vulnerabilities:
+            - OSV Scanner: Check osv-report.txt
+            - Trivy: Check trivy-report.txt  
+            - OWASP Dependency Check: Check dependency-check-summary.txt
+
+            Please review and remediate the identified vulnerabilities.
           attachments: |
             osv-report.txt
             trivy-report.txt
+            dependency-check-summary.txt
+
       - name: Fail job if vulnerabilities found
         if: env.VULN_FOUND == 'true'
         run: exit 1
+
+  dast-scan:
+    runs-on: ubuntu-latest
+    needs: sast-scan
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run database migrations and seed data
+        run: |
+          npm run migration:run || echo "No migration script found"
+        env:
+          NODE_ENV: production
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: test_db
+
+      - name: Start NestJS application
+        run: |
+          npm run start:prod &
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+        env:
+          NODE_ENV: production
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: test_db
+          PORT: 3000
+          JWT_SECRET: test-jwt-secret
+          PRE_SHARED_API_KEY: test-api-key
+
+      - name: Run OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: "http://localhost:3000"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a -j"
+          artifact_name: ""
+
+      - name: Upload ZAP results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-results-nestjs
+          path: |
+            report_html.html
+            report_json.json
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
+
+    // Create ZAP configuration directory and rules file
+    const zapDir = path.join(targetDir, ".zap");
+    fs.ensureDirSync(zapDir);
+    
+    const zapRules = `# .zap/rules.tsv
+# OWASP ZAP Rules Configuration for NestJS
+# Format: RULE_ID    ACTION    DESCRIPTION
+
+# Common false positives to ignore
+10011    IGNORE    Cookie Without Secure Flag
+10015    IGNORE    Incomplete or No Cache-control and Pragma HTTP Header Set
+10021    IGNORE    X-Content-Type-Options Header Missing
+10020    IGNORE    X-Frame-Options Header Not Set
+10016    IGNORE    Web Browser XSS Protection Not Enabled
+10017    IGNORE    Cross-Domain JavaScript Source File Inclusion
+10035    IGNORE    Strict-Transport-Security Header Not Set
+10063    IGNORE    Permissions Policy Header Not Set
+
+# Development environment specific ignores
+10098    IGNORE    Cross-Domain Misconfiguration
+10055    IGNORE    CSP Scanner: Wildcard Directive
+10038    IGNORE    Content Security Policy (CSP) Header Not Set
+
+# API-specific rules
+10024    WARN      Information Disclosure - Sensitive Information in URL
+10025    WARN      Information Disclosure - Sensitive Information in HTTP Referrer Header
+10027    WARN      Information Disclosure - Suspicious Comments
+
+# Security rules to enforce (FAIL)
+90020    FAIL      Remote Code Execution - CVE-2012-1823
+90019    FAIL      Code Injection
+40018    FAIL      SQL Injection
+40019    FAIL      SQL Injection - MySQL
+40020    FAIL      SQL Injection - Hypersonic SQL
+40021    FAIL      SQL Injection - Oracle
+40022    FAIL      SQL Injection - PostgreSQL
+90018    FAIL      Remote Code Execution - CVE-2014-6271
+`;
+
+    fs.writeFileSync(path.join(zapDir, "rules.tsv"), zapRules);
   }
 
   // Add naming conventions and spell check similar to basic template
@@ -4202,14 +4474,25 @@ jobs:
 on:
   push:
     branches: [main, develop]
+    paths:
+      - "**"
   pull_request:
     branches: [main, develop]
+    paths:
+      - "**"
 
 jobs:
-  osv-trivy-scan:
+  api-sast-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: 'api/package-lock.json'
+
       - name: Install OSV Scanner
         run: |
           curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
@@ -4247,6 +4530,7 @@ jobs:
               echo "❌ Email Service Vulnerabilities found!"
             fi
           fi
+
       - name: Install Trivy
         run: |
           sudo apt-get update && sudo apt-get install -y wget
@@ -4268,6 +4552,77 @@ jobs:
             echo "VULN_FOUND=true" >> \$GITHUB_ENV
             echo "❌ Email Service Vulnerabilities found by Trivy!"
           fi
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: Run OWASP Dependency Check on API
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "enterprise-api"
+          path: "./api"
+          format: "JSON"
+          out: "api-dependency-check-report"
+
+      - name: Install Email Service dependencies
+        working-directory: ./email-service
+        run: npm ci
+
+      - name: Run OWASP Dependency Check on Email Service
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "email-service"
+          path: "./email-service"
+          format: "JSON"
+          out: "email-dependency-check-report"
+
+      - name: Check Dependency Check reports for vulnerabilities
+        run: |
+          # Check API report
+          if [ -f api-dependency-check-report/dependency-check-report.json ]; then
+            API_VULN_COUNT=\$(jq '.dependencies[].vulnerabilities | select(. != null) | length' api-dependency-check-report/dependency-check-report.json | awk '{s+=\$1} END {print s}')
+            if [ "\$API_VULN_COUNT" -gt 0 ]; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ API Vulnerabilities found by Dependency Check!"
+            fi
+          fi
+          # Check Email Service report
+          if [ -f email-dependency-check-report/dependency-check-report.json ]; then
+            EMAIL_VULN_COUNT=\$(jq '.dependencies[].vulnerabilities | select(. != null) | length' email-dependency-check-report/dependency-check-report.json | awk '{s+=\$1} END {print s}')
+            if [ "\$EMAIL_VULN_COUNT" -gt 0 ]; then
+              echo "VULN_FOUND=true" >> \$GITHUB_ENV
+              echo "❌ Email Service Vulnerabilities found by Dependency Check!"
+            fi
+          fi
+
+      - name: Summarize Dependency Check vulnerabilities
+        run: |
+          API_SUMMARY_FILE="api-dependency-summary.txt"
+          EMAIL_SUMMARY_FILE="email-dependency-summary.txt"
+          
+          # API summary
+          if [ -f api-dependency-check-report/dependency-check-report.json ]; then
+            echo -e "API Service - Vulnerable Dependency | Vulnerability ID | Severity | Description\\n---------------------|-------------------|----------|------------" > \$API_SUMMARY_FILE
+            jq -r '.dependencies[] | select(.vulnerabilities != null) | .fileName as \$dep | .vulnerabilities[] | [\$dep, .name, .severity, (.description | gsub("\\n"; " "))] | @tsv' api-dependency-check-report/dependency-check-report.json | while IFS=\$'\\t' read -r dep id severity desc; do
+              wrapped_desc=\$(echo "\$desc" | fold -s -w 120)
+              printf "%s | %s | %s | %s\\n\\n" "\$dep" "\$id" "\$severity" "\$wrapped_desc" >> \$API_SUMMARY_FILE
+            done
+          else
+            echo "No API Dependency Check report found." > \$API_SUMMARY_FILE
+          fi
+          
+          # Email Service summary
+          if [ -f email-dependency-check-report/dependency-check-report.json ]; then
+            echo -e "Email Service - Vulnerable Dependency | Vulnerability ID | Severity | Description\\n---------------------|-------------------|----------|------------" > \$EMAIL_SUMMARY_FILE
+            jq -r '.dependencies[] | select(.vulnerabilities != null) | .fileName as \$dep | .vulnerabilities[] | [\$dep, .name, .severity, (.description | gsub("\\n"; " "))] | @tsv' email-dependency-check-report/dependency-check-report.json | while IFS=\$'\\t' read -r dep id severity desc; do
+              wrapped_desc=\$(echo "\$desc" | fold -s -w 120)
+              printf "%s | %s | %s | %s\\n\\n" "\$dep" "\$id" "\$severity" "\$wrapped_desc" >> \$EMAIL_SUMMARY_FILE
+            done
+          else
+            echo "No Email Service Dependency Check report found." > \$EMAIL_SUMMARY_FILE
+          fi
+
       - name: Send vulnerability report email
         if: env.VULN_FOUND == 'true' && secrets.SMTP_SERVER != ''
         uses: dawidd6/action-send-mail@v3
@@ -4276,23 +4631,147 @@ jobs:
           server_port: 465
           username: \${{ secrets.SMTP_USERNAME }}
           password: \${{ secrets.SMTP_PASSWORD }}
-          subject: "Enterprise API Vulnerability Scan Failed - \${{ github.repository }}"
+          subject: "Enterprise API Security Scan Failed - \${{ github.repository }}"
           to: \${{ secrets.SMTP_MAIL_TO }}
           from: \${{ secrets.SMTP_MAIL_FROM }}
           body: |
-            The vulnerability scan failed for \${{ github.repository }}.
-            See attached reports for details.
+            Security vulnerability scan failed for \${{ github.repository }}.
+
+            Tools that found vulnerabilities:
+            - OSV Scanner: Check osv-api-report.txt and osv-email-report.txt
+            - Trivy: Check trivy-api-report.txt and trivy-email-report.txt  
+            - OWASP Dependency Check: Check api-dependency-summary.txt and email-dependency-summary.txt
+
+            Please review and remediate the identified vulnerabilities.
           attachments: |
             osv-api-report.txt
             osv-email-report.txt
             trivy-api-report.txt
             trivy-email-report.txt
+            api-dependency-summary.txt
+            email-dependency-summary.txt
+
       - name: Fail job if vulnerabilities found
         if: env.VULN_FOUND == 'true'
         run: exit 1
+
+  api-dast-scan:
+    runs-on: ubuntu-latest
+    needs: api-sast-scan
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: 'npm'
+          cache-dependency-path: 'api/package-lock.json'
+
+      - name: Install and build API
+        working-directory: ./api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run database migrations and seed data
+        working-directory: ./api
+        run: |
+          npm run migration:run || echo "No migration script found"
+        env:
+          NODE_ENV: production
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: test_db
+
+      - name: Start API application
+        working-directory: ./api
+        run: |
+          npm run start:prod &
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+        env:
+          NODE_ENV: production
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: test_db
+          PORT: 3000
+          JWT_SECRET: test-jwt-secret
+          PRE_SHARED_API_KEY: test-api-key
+
+      - name: Run OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: "http://localhost:3000"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a -j"
+          artifact_name: ""
+
+      - name: Upload ZAP results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-results-enterprise-api
+          path: |
+            report_html.html
+            report_json.json
 `;
 
     fs.writeFileSync(path.join(workflowsDir, "security.yml"), securityWorkflow);
+
+    // Create ZAP configuration directory and rules file
+    const zapDir = path.join(targetDir, ".zap");
+    fs.ensureDirSync(zapDir);
+    
+    const zapRules = `# .zap/rules.tsv
+# OWASP ZAP Rules Configuration for Enterprise API
+# Format: RULE_ID    ACTION    DESCRIPTION
+
+# Common false positives to ignore
+10011    IGNORE    Cookie Without Secure Flag
+10015    IGNORE    Incomplete or No Cache-control and Pragma HTTP Header Set
+10021    IGNORE    X-Content-Type-Options Header Missing
+10020    IGNORE    X-Frame-Options Header Not Set
+10016    IGNORE    Web Browser XSS Protection Not Enabled
+10017    IGNORE    Cross-Domain JavaScript Source File Inclusion
+10035    IGNORE    Strict-Transport-Security Header Not Set
+10063    IGNORE    Permissions Policy Header Not Set
+
+# Development environment specific ignores
+10098    IGNORE    Cross-Domain Misconfiguration
+10055    IGNORE    CSP Scanner: Wildcard Directive
+10038    IGNORE    Content Security Policy (CSP) Header Not Set
+
+# API-specific rules
+10024    WARN      Information Disclosure - Sensitive Information in URL
+10025    WARN      Information Disclosure - Sensitive Information in HTTP Referrer Header
+10027    WARN      Information Disclosure - Suspicious Comments
+
+# Security rules to enforce (FAIL)
+90020    FAIL      Remote Code Execution - CVE-2012-1823
+90019    FAIL      Code Injection
+40018    FAIL      SQL Injection
+40019    FAIL      SQL Injection - MySQL
+40020    FAIL      SQL Injection - Hypersonic SQL
+40021    FAIL      SQL Injection - Oracle
+40022    FAIL      SQL Injection - PostgreSQL
+90018    FAIL      Remote Code Execution - CVE-2014-6271
+`;
+
+    fs.writeFileSync(path.join(zapDir, "rules.tsv"), zapRules);
   }
 
   // Add naming conventions and spell check for enterprise
