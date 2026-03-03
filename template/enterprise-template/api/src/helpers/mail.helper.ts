@@ -79,7 +79,7 @@ class MailHelper {
     return this;
   }
 
-  async enque(queryRunner?: QueryRunner): Promise<any> {
+  async enqueue(queryRunner?: QueryRunner): Promise<any> {
     if (!this.to) {
       throw new InternalServerErrorException('to must not be null');
     }

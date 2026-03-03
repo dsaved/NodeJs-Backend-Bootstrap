@@ -303,7 +303,7 @@ export class UsersService {
           <br/>Password: <b>${newPassword}</b><br/> </p>`,
         )
         .setTo(record.emailAddress)
-        .enque(queryRunner);
+        .enqueue(queryRunner);
 
       // Log the action
       await queryRunner.manager.save(
@@ -355,7 +355,7 @@ export class UsersService {
           <br/>Password: <b>${data.password}</b><br/> </p>`,
         )
         .setTo(record.emailAddress)
-        .enque(queryRunner);
+        .enqueue(queryRunner);
 
       // Log the action
       await queryRunner.manager.save(
@@ -435,7 +435,7 @@ export class UsersService {
   `,
         )
         .setTo(data.emailAddress)
-        .enque(queryRunner);
+        .enqueue(queryRunner);
 
       // Log the action
       await queryRunner.manager.save(Log, {

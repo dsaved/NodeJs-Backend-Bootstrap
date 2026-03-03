@@ -44,7 +44,7 @@ export class OTPService {
           <p>Best regards,<br>`,
         )
         .setTo(data.email)
-        .enque(queryRunner);
+        .enqueue(queryRunner);
 
       // Commit transaction
       await queryRunner.commitTransaction();
@@ -125,7 +125,7 @@ export class OTPService {
             <p>Best regards,<br>`,
           )
           .setTo(email)
-          .enque(queryRunner);
+          .enqueue(queryRunner);
 
         // Save the updated OTP entity
         await queryRunner.manager.save(existingOtp);

@@ -1439,6 +1439,16 @@ async function customizeEnterpriseAPIPackageJson(targetDir, answers) {
       break;
   }
 
+  // Add CI scripts if security scanning is enabled
+  if (answers.githubCheckTypes?.includes('security')) {
+    packageJson.scripts["ci:naming"] = "bash scripts/check-naming-conventions.sh";
+    packageJson.scripts["ci:spell"] = "bash scripts/check-spelling.sh";
+    packageJson.scripts["ci:security"] = "bash scripts/check-security.sh";
+    packageJson.scripts["ci:pre-push"] = "bash scripts/pre-push-checks.sh";
+    packageJson.scripts["ci:all"] = "npm run ci:naming && npm run ci:spell && npm run lint && npm run ci:security";
+    packageJson.scripts["fix:unused-vars"] = "node scripts/fix-unused-vars.js";
+  }
+
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 }
 

@@ -11,7 +11,7 @@ import { OTPModule } from './api/otp/otp.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dbConfig } from './constructs/env';
 import { join } from 'path';
-import { EmailNotificationModule } from './api/email_notification/email.notification.module';
+import { EmailNotificationModule } from './api/email-notification/email.notification.module';
 import { RolessModule } from './api/roles/role.module';
 import { CountryMiddleware } from './middlewares/country';
 import { APP_GUARD } from '@nestjs/core';

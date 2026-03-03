@@ -4,4 +4,4 @@ export * as envs from './env';
 export * as interfaces from './interfaces';
 export * as messages from './messages';
 export * as classes from './class';
-export * as regExp from './regExp';
+export * as regExp from './reg-exp';
